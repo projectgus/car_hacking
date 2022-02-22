@@ -19,10 +19,10 @@ def send_gear(rmt, gear, snow=False, sport=False, err=False):
         "3": 0b0100,
         "2": 0b0101,
         "1": 0b0110,
-        "P*": 0b0111,
+        "P*": 0b0111,  # * == flashing
         "R*": 0b1000,
         "N*": 0b1001,
-        "": 0b1100,
+        "": 0b1100,  # blank display
         "3*": 0b1101,
         "2*": 0b1110,
         "1*": 0b1111,
