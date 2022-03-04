@@ -1,0 +1,4 @@
+**/target
+.gdb_history
+__pycache__
+.envrc

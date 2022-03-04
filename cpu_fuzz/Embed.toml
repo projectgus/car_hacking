@@ -1,0 +1,16 @@
+[default.probe]
+# STLink-V2
+usb_vid = "0483"
+usb_pid = "374b"
+
+[default.general]
+# The chip name of the chip to be debugged.
+chip = "STM32F303VCTx"
+
+
+[default.reset]
+enabled = true
+halt_afterwards = true
+
+[default.gdb]
+enabled = true
