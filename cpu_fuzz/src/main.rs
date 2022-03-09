@@ -11,6 +11,8 @@ mod monotimer;
 use monotimer::MonoTimer;
 use stm32f3_discovery::stm32f3xx_hal::pac::usart1;
 
+mod can;
+use can::CANBus;
 use stm32f3_discovery::stm32f3xx_hal::{
     pac::{self, USART1},
     prelude::*,
@@ -64,6 +66,7 @@ fn init() -> (&'static mut usart1::RegisterBlock, MonoTimer, ITM) {
 
     let clocks = rcc.cfgr.freeze(&mut flash.acr);
 
+    let mut gpiob = dp.GPIOB.split(&mut rcc.ahb);
     let mut gpioc = dp.GPIOC.split(&mut rcc.ahb);
 
     let tx = gpioc
@@ -74,6 +77,16 @@ fn init() -> (&'static mut usart1::RegisterBlock, MonoTimer, ITM) {
         .into_af7_push_pull(&mut gpioc.moder, &mut gpioc.otyper, &mut gpioc.afrl);
 
     Serial::new(dp.USART1, (tx, rx), 115_200.Bd(), clocks, &mut rcc.apb2);
+
+    let (can_rx, can_tx) = cortex_m::interrupt::free(|cs| {
+        (
+            gpiob.pb8.into_alternate_af4(cs),
+            gpiob.pb9.into_alternate_af4(cs),
+        )
+    });
+
+    let can = CANBus::new(device.CAN, can_rx, can_tx);
+    can.listen(can::Event::RxMessagePending);
 
     unsafe {
         (
