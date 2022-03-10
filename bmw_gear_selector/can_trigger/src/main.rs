@@ -19,7 +19,6 @@ mod monotimer;
 use bxcan::filter::Mask32;
 use bxcan::{Frame, StandardId};
 use monotimer::MonoTimer;
-use nb::block;
 use stm32f3xx_hal::can::Can;
 use stm32f3xx_hal::pac::usart1;
 use stm32f3xx_hal::{
@@ -43,7 +42,7 @@ fn main() -> ! {
                 let can_frame = Frame::new_data(can_id, can_data);
 
                 // Note: this retries until something ACKs the frame
-                block!(can.transmit(&can_frame)).expect("Cannot send CAN frame");
+                can.transmit(&can_frame).expect("Cannot send CAN frame");
                 trigger.set_high().ok();
                 defmt::trace!("sent CAN frame");
             } else {
@@ -92,12 +91,14 @@ pub type CanTx = PD1<AF7<PushPull>>;
 pub type CanRx = PD0<AF7<PushPull>>;
 pub type CanInstance = bxcan::Can<stm32f3xx_hal::can::Can<CanTx, CanRx>>;
 
+pub type TriggerOutput = PC12<stm32f3xx_hal::gpio::Output<stm32f3xx_hal::gpio::PushPull>>;
+
 fn init() -> (
     &'static mut usart1::RegisterBlock,
     MonoTimer,
     ITM,
     CanInstance,
-    PC12<stm32f3xx_hal::gpio::Output<stm32f3xx_hal::gpio::PushPull>>,
+    TriggerOutput,
 ) {
     let cp = cortex_m::Peripherals::take().unwrap();
     let dp = pac::Peripherals::take().unwrap();
@@ -159,7 +160,7 @@ fn init() -> (
     drop(filters);
 
     // Sync to the bus and start normal operation.
-    block!(can.enable_non_blocking()).ok();
+    can.enable_non_blocking().ok();
 
     let trigger = gpioc
         .pc12
