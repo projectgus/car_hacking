@@ -1,7 +1,9 @@
 #![no_main]
 #![no_std]
 
-extern crate panic_itm; // panic handler
+use core::sync::atomic::{AtomicUsize, Ordering};
+use defmt_rtt as _;
+use panic_probe as _; // global logger
 
 use cortex_m::{iprint, iprintln, peripheral::ITM};
 use cortex_m_rt::entry;
@@ -18,7 +20,7 @@ use stm32f3xx_hal::pac::usart1;
 
 use bxcan::filter::Mask32;
 use bxcan::{Frame, StandardId};
-
+use nb::block;
 use stm32f3xx_hal::{
     pac::{self, USART1},
     prelude::*,
@@ -27,12 +29,15 @@ use stm32f3xx_hal::{
 
 #[entry]
 fn main() -> ! {
-    let (usart1, _mono_timer, _itm, can) = init();
+    let (usart1, _mono_timer, _itm, mut can) = init();
 
     defmt::trace!("initialized");
 
     // A buffer with 32 bytes of capacity
     let mut buffer: Vec<u8, 32> = Vec::new();
+
+    let can_data: [u8; 1] = [1];
+    let can_frame = Frame::new_data(StandardId::new(0x500).unwrap(), can_data);
 
     loop {
         buffer.clear();
@@ -40,6 +45,10 @@ fn main() -> ! {
         loop {
             while usart1.isr.read().rxne().bit_is_clear() {}
             let byte = usart1.rdr.read().rdr().bits() as u8;
+
+            // Note: this retries until something ACKs the frame
+            block!(can.transmit(&can_frame)).expect("Cannot send CAN frame");
+            defmt::trace!("sent CAN frame");
 
             if buffer.push(byte).is_err() {
                 defmt::trace!("buffer full");
@@ -136,6 +145,9 @@ fn init() -> (
     // Enable filters.
     drop(filters);
 
+    // Sync to the bus and start normal operation.
+    block!(can.enable_non_blocking()).ok();
+
     unsafe {
         (
             &mut *(USART1::ptr() as *mut _),
@@ -144,4 +156,11 @@ fn init() -> (
             can,
         )
     }
+}
+
+// same panicking *behavior* as `panic-probe` but doesn't print a panic message
+// this prevents the panic message being printed *twice* when `defmt::panic` is invoked
+#[defmt::panic_handler]
+fn panic() -> ! {
+    cortex_m::asm::udf()
 }

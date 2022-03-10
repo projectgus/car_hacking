@@ -10,7 +10,10 @@ chip = "STM32F303VCTx"
 
 [default.reset]
 enabled = true
-halt_afterwards = true
+halt_afterwards = false
 
 [default.gdb]
+enabled = true
+
+[default.rtt]
 enabled = true
