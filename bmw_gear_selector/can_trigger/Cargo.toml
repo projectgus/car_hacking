@@ -1,5 +1,5 @@
 [package]
-name = "cpu_fuzz"
+name = "can_trigger"
 version = "0.1.0"
 edition = "2021"
 
@@ -14,6 +14,7 @@ heapless = "0.7.10"
 nb = "1.0.0"
 panic-itm = "0.4.2"
 stm32f3xx-hal = { version = "0.9.0", features = ["can", "stm32f303xc", "rt"] }
+no-std-compat = "0.4.1"
 
 [dev-dependencies]
 defmt-test = "0.3.0"

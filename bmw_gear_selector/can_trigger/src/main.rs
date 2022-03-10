@@ -1,11 +1,13 @@
 #![no_main]
 #![no_std]
 
-use core::sync::atomic::{AtomicUsize, Ordering};
+use no_std_compat::str;
+use stm32f3xx_hal::gpio::PC12;
+
 use defmt_rtt as _;
 use panic_probe as _; // global logger
 
-use cortex_m::{iprint, iprintln, peripheral::ITM};
+use cortex_m::peripheral::ITM;
 use cortex_m_rt::entry;
 use heapless::Vec;
 #[allow(unused_imports)]
@@ -14,13 +16,12 @@ use stm32f3xx_hal::gpio::PushPull;
 use stm32f3xx_hal::gpio::AF7;
 use stm32f3xx_hal::gpio::{PD0, PD1};
 mod monotimer;
-use monotimer::MonoTimer;
-use stm32f3xx_hal::can::Can;
-use stm32f3xx_hal::pac::usart1;
-
 use bxcan::filter::Mask32;
 use bxcan::{Frame, StandardId};
+use monotimer::MonoTimer;
 use nb::block;
+use stm32f3xx_hal::can::Can;
+use stm32f3xx_hal::pac::usart1;
 use stm32f3xx_hal::{
     pac::{self, USART1},
     prelude::*,
@@ -29,48 +30,59 @@ use stm32f3xx_hal::{
 
 #[entry]
 fn main() -> ! {
-    let (usart1, _mono_timer, _itm, mut can) = init();
+    let (usart1, _mono_timer, _itm, mut can, mut trigger) = init();
 
-    defmt::trace!("initialized");
-
-    // A buffer with 32 bytes of capacity
-    let mut buffer: Vec<u8, 32> = Vec::new();
-
-    let can_data: [u8; 1] = [1];
-    let can_frame = Frame::new_data(StandardId::new(0x500).unwrap(), can_data);
+    defmt::trace!("initialised, waiting for test ID");
 
     loop {
-        buffer.clear();
+        trigger.set_low().ok();
 
-        loop {
-            while usart1.isr.read().rxne().bit_is_clear() {}
-            let byte = usart1.rdr.read().rdr().bits() as u8;
+        if let Some(id) = read_id(usart1) {
+            if let Some(can_id) = StandardId::new(id) {
+                let can_data: [u8; 8] = [1; 8];
+                let can_frame = Frame::new_data(can_id, can_data);
 
-            // Note: this retries until something ACKs the frame
-            block!(can.transmit(&can_frame)).expect("Cannot send CAN frame");
-            defmt::trace!("sent CAN frame");
-
-            if buffer.push(byte).is_err() {
-                defmt::trace!("buffer full");
-                // buffer full
-                for byte in b"error: buffer full\n\r" {
-                    while usart1.isr.read().txe().bit_is_clear() {}
-                    usart1.tdr.write(|w| w.tdr().bits(u16::from(*byte)));
-                }
-
-                break;
+                // Note: this retries until something ACKs the frame
+                block!(can.transmit(&can_frame)).expect("Cannot send CAN frame");
+                trigger.set_high().ok();
+                defmt::trace!("sent CAN frame");
+            } else {
+                defmt::error!("bad CAN ID {}", id);
             }
+        }
+    }
+}
 
-            // Carriage return
-            if byte == 13 {
-                defmt::trace!("echoing");
-                // Respond
-                for byte in buffer.iter().rev().chain(&[b'\n', b'\r']) {
-                    while usart1.isr.read().txe().bit_is_clear() {}
-                    usart1.tdr.write(|w| w.tdr().bits(u16::from(*byte)));
+fn read_id(usart1: &mut usart1::RegisterBlock) -> Option<u16> {
+    let mut buffer: Vec<u8, 8> = Vec::new();
+
+    loop {
+        while usart1.isr.read().rxne().bit_is_clear() {}
+        let byte = usart1.rdr.read().rdr().bits() as u8;
+
+        if (b'0' <= byte && byte <= b'9')
+            || (b'a' <= byte && byte <= b'f')
+            || (b'A' <= byte && byte <= b'F')
+        {
+            if buffer.push(byte).is_err() {
+                defmt::error!("rx buffer full");
+                return None;
+            }
+        }
+
+        if byte == b'\n' {
+            if let Ok(s) = str::from_utf8(&buffer) {
+                defmt::trace!("buffer {}", s);
+                if let Ok(n) = u16::from_str_radix(s, 16) {
+                    defmt::info!("read ID {:x}", n);
+                    return Some(n);
+                } else {
+                    defmt::error!("failed to parse hex");
+                    return None;
                 }
-
-                break;
+            } else {
+                defmt::error!("failed to parse utf8");
+                return None;
             }
         }
     }
@@ -85,6 +97,7 @@ fn init() -> (
     MonoTimer,
     ITM,
     CanInstance,
+    PC12<stm32f3xx_hal::gpio::Output<stm32f3xx_hal::gpio::PushPull>>,
 ) {
     let cp = cortex_m::Peripherals::take().unwrap();
     let dp = pac::Peripherals::take().unwrap();
@@ -148,12 +161,17 @@ fn init() -> (
     // Sync to the bus and start normal operation.
     block!(can.enable_non_blocking()).ok();
 
+    let trigger = gpioc
+        .pc12
+        .into_push_pull_output(&mut gpioc.moder, &mut gpioc.otyper);
+
     unsafe {
         (
             &mut *(USART1::ptr() as *mut _),
             MonoTimer::new(cp.DWT, clocks),
             cp.ITM,
             can,
+            trigger,
         )
     }
 }
