@@ -1,4 +1,4 @@
-use stm32f3_discovery::stm32f3xx_hal as hal;
+use stm32f3xx_hal as hal;
 
 use cortex_m::peripheral::DWT;
 use hal::{rcc::Clocks, time::rate::Hertz};

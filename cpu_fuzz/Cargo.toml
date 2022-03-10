@@ -4,11 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+bxcan = "0.6.2"
 cortex-m = "0.7.2"
-cortex-m-rt = "0.6.14"
+cortex-m-rt = "0.7.1"
 defmt = "0.3.0"
 heapless = "0.7.10"
 nb = "1.0.0"
 panic-itm = "0.4.2"
-stm32f3-discovery = "0.7.2"
-stm32f3xx-hal = { version = "0.9.0", features = ["can"] }
+stm32f3xx-hal = { version = "0.9.0", features = ["can", "stm32f303xc", "rt"] }
