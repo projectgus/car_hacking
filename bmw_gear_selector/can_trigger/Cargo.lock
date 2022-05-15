@@ -87,6 +87,7 @@ dependencies = [
  "defmt",
  "defmt-rtt",
  "defmt-test",
+ "embedded-time",
  "heapless",
  "nb 1.0.0",
  "no-std-compat",

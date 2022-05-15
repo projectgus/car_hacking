@@ -34,13 +34,7 @@ def main():
     #bus.send(msg)
     #return
     #scan_forever(bus)
-
-    for channel in (1,):
-        print(f"Channel {channel}")
-        #send_backlight(bus, channel, 0xF0)
-        #send_damien(bus, channel)
-        scan(bus, channel)
-    print("Done")
+    send_backlight(bus, 0, 4)
 
 
 def send_damien(bus, channel):
@@ -59,6 +53,7 @@ def send_backlight(bus, channel, brightness):
     tx = can.Message(arbitration_id=0x202, data=data, is_extended_id=False, channel=channel)
     print(tx)
     bus.send(tx)
+    print(f'Set backlight to {brightness} (channel {channel})')
 
 
 def send_known(bus, channel):
