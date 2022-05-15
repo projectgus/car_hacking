@@ -1,0 +1,93 @@
+In [245]: bmw_gws_uds.try_message(bus)
+Base bytes 0x0
+Changing offset 0
+Message Timestamp:        0.000000        ID: 03fd    S Rx                DL:  8    70 00 00 00 00 00 00 00
+   E09404 -> 46
+Message Timestamp:        0.000000        ID: 03fd    S Rx                DL:  8    71 00 00 00 00 00 00 00
+   E09404 -> 46
+Changing offset 1
+Message Timestamp:        0.000000        ID: 03fd    S Rx                DL:  8    00 d7 00 00 00 00 00 00
+   E09404 -> 46
+Changing offset 2
+Message Timestamp:        0.000000        ID: 03fd    S Rx                DL:  8    00 00 ab 00 00 00 00 00
+   E09404 -> 46
+Changing offset 3
+Message Timestamp:        0.000000        ID: 03fd    S Rx                DL:  8    00 00 00 6e 00 00 00 00
+   E09404 -> 46
+Changing offset 4
+Message Timestamp:        0.000000        ID: 03fd    S Rx                DL:  8    00 00 00 00 32 00 00 00
+   E09404 -> 46
+Changing offset 5
+Changing offset 6
+Changing offset 7
+Base bytes 0x1
+Changing offset 0
+Message Timestamp:        0.000000        ID: 03fd    S Rx                DL:  8    33 01 01 01 01 01 01 01
+   E09404 -> 46
+Changing offset 1
+Message Timestamp:        0.000000        ID: 03fd    S Rx                DL:  8    01 be 01 01 01 01 01 01
+   E09404 -> 46
+Changing offset 2
+Message Timestamp:        0.000000        ID: 03fd    S Rx                DL:  8    01 01 d6 01 01 01 01 01
+   E09404 -> 46
+Changing offset 3
+Message Timestamp:        0.000000        ID: 03fd    S Rx                DL:  8    01 01 01 aa 01 01 01 01
+   E09404 -> 46
+Changing offset 4
+Message Timestamp:        0.000000        ID: 03fd    S Rx                DL:  8    01 01 01 01 6f 01 01 01
+   E09404 -> 46
+Changing offset 5
+Changing offset 6
+Changing offset 7
+Base bytes 0x2
+Changing offset 0
+Message Timestamp:        0.000000        ID: 03fd    S Rx                DL:  8    f6 02 02 02 02 02 02 02
+   E09404 -> 46
+Changing offset 1
+Message Timestamp:        0.000000        ID: 03fd    S Rx                DL:  8    02 05 02 02 02 02 02 02
+   E09404 -> 46
+Changing offset 2
+Message Timestamp:        0.000000        ID: 03fd    S Rx                DL:  8    02 02 51 02 02 02 02 02
+   E09404 -> 46
+Changing offset 3
+Message Timestamp:        0.000000        ID: 03fd    S Rx                DL:  8    02 02 02 fb 02 02 02 02
+   E09404 -> 46
+Changing offset 4
+Message Timestamp:        0.000000        ID: 03fd    S Rx                DL:  8    02 02 02 02 88 02 02 02
+   E09404 -> 46
+Message Timestamp:        0.000000        ID: 03fd    S Rx                DL:  8    02 02 02 02 89 02 02 02
+   E09404 -> 46
+Changing offset 5
+Changing offset 6
+Changing offset 7
+Base bytes 0x3
+Changing offset 0
+Message Timestamp:        0.000000        ID: 03fd    S Rx                DL:  8    b5 03 03 03 03 03 03 03
+   E09404 -> 46
+Changing offset 1
+Message Timestamp:        0.000000        ID: 03fd    S Rx                DL:  8    03 6c 03 03 03 03 03 03
+   E09404 -> 46
+Changing offset 2
+Message Timestamp:        0.000000        ID: 03fd    S Rx                DL:  8    03 03 2c 03 03 03 03 03
+   E09404 -> 46
+Message Timestamp:        0.000000        ID: 03fd    S Rx                DL:  8    03 03 2d 03 03 03 03 03
+   E09404 -> 46
+^[Changing offset 3
+Message Timestamp:        0.000000        ID: 03fd    S Rx                DL:  8    03 03 03 3f 03 03 03 03
+   E09404 -> 46
+Changing offset 4
+Message Timestamp:        0.000000        ID: 03fd    S Rx                DL:  8    03 03 03 03 d5 03 03 03
+   E09404 -> 46
+Changing offset 5
+Changing offset 6
+Changing offset 7
+Base bytes 0x4
+Changing offset 0
+Message Timestamp:        0.000000        ID: 03fd    S Rx                DL:  8    61 04 04 04 04 04 04 04
+   E09404 -> 46
+Changing offset 1
+Message Timestamp:        0.000000        ID: 03fd    S Rx                DL:  8    04 6e 04 04 04 04 04 04
+   E09404 -> 46
+Changing offset 2
+Message Timestamp:        0.000000        ID: 03fd    S Rx                DL:  8    04 04 42 04 04 04 04 04
+   E09404 -> 46
