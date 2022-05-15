@@ -1,5 +1,6 @@
 import asyncio
 import can
+import crccheck
 import isotp
 import time
 import threading
@@ -64,7 +65,8 @@ def decode_dtcdata(dtcdata):
     return dtcs
 
 
-def try_message(bus):
+def search_valid_checksums(bus):
+    """ Iteratively send junk messages and wait for ones that look like they have valid checksums """
     for base in range(255):
         print(f'Base bytes {base:#x}')
         for offs in range(8):
@@ -86,6 +88,44 @@ def try_message(bus):
                     print(f'Message {message}')
                     print(f'   E09404 -> {csum_dtc}')
 
+
+def verify_checksum(bus, payload):
+    """ Return 'True' if 'payload' appears to have a valid checksum according to the GWS DTC status! """
+    message = can.Message(arbitration_id=0x3fd, data=payload, is_extended_id=False)
+    for _ in range(16):
+        bus.send(message)
+        time.sleep(0.01)
+
+    time.sleep(0.1)
+
+    dtcs = get_dtcs(bus)
+    csum_dtc = dtcs.get('e09404', 'missing')
+    return csum_dtc == 46
+
+
+def find_checksum(bus, message):
+    if len(message) != 4:
+        print('WARNING: Expected 4 byte message')
+    for chksum in range(0x100):
+        if verify_checksum(bus, [chksum] + list(message)):
+            return chksum
+    raise RuntimeError("No valid checksum found...")
+
+
+def bmw_3fd_crc(message):
+    """ Thanks to colin o'flynns CRCBeagle for calculating this https://github.com/colinoflynn/crcbeagle """
+    crc = crccheck.crc.Crc8Base
+    crc._poly = 0x1D
+    crc._reflect_input = False
+    crc._reflect_output = False
+    crc._initvalue = 0x0
+    crc._xor_output = 0x70
+    output_int = crc.calc(message)
+    return output_int & 0xFF
+
+def confirm_working_checksum(bus, message):
+    """ Simple function to use the DTCs to check if bmw_3fd_crc() returns correct values """
+    return verify_checksum(bus, [bmw_3fd_crc(message)] + message)
 
 def simple_query(bus, send_data):
     txid = 0x7ca
