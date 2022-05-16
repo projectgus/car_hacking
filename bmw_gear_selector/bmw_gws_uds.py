@@ -152,17 +152,58 @@ def find_counter_fields(bus):
 
 def send_gws_status(bus, status_bytes, tx_seconds=3):
     assert len(status_bytes) == 3
+
+    dimming_data = bytes([0x40, 0x00])
+    dimming_message = can.Message(arbitration_id=0x202, data=dimming_data,
+                                    is_extended_id=False, channel=0)
+
+
+    # Sample data for messages 0x328, 0x393, 0x3A0 all from https://www.picoauto.com/support/topic21680.html#p98295
+    clock_message = can.Message(arbitration_id=0x328, data=[ 0x00, 0x42, 0x29, 0x0A, 0x39, 0x1B],
+                                is_extended_id=False, channel=0)
+
+    lcd_backlight_message = can.Message(arbitration_id=0x393, data=[0x3F, 0x32, 0x00, 0xFD],
+                                        is_extended_id=False, channel=0)
+
+    vehicle_condition_data = [0xFF, 0xFF, 0xC0, 0xFF, 0xFF, 0xFF, 0xFF, 0xFC]
+    vehicle_condition_message = can.Message(arbitration_id=0x3A0, data=vehicle_condition_data,
+                                            is_extended_id=False, channel=0)
+
     counter = 0
     t0 = time.time()
+    last_clock = 0
     while time.time() < t0 + tx_seconds:
-        payload = [ counter & 0x0F ] + status_bytes
+        payload = [ counter & 0xFF ] + status_bytes
         payload = [ bmw_3fd_crc(payload) ] + payload
         message = can.Message(arbitration_id=0x3fd, data=payload, is_extended_id=False)
-        #print(message)
+        print(message)
+        message.channel = 0
         bus.send(message)
+        #message.channel = 1
+        #bus.send(message)
+
+        #bus.send(dimming_message)
+
+        #if time.time() - last_clock > 1.0:
+        #    last_clock = time.time()
+        #    clock_message.data[0] = (int(time.time() - t0) + 0xD0) & 0xFF
+        #    bus.send(clock_message)
+        #    bus.send(lcd_backlight_message)
+        #    bus.send(vehicle_condition_message)
+
+        # https://www.reddit.com/r/CarHacking/comments/ti6cae/comment/i4tie8w/?utm_source=reddit&utm_medium=web2x&context=3
+        #terminals_data = [ counter & 0xFF, (counter >> 8) & 0xFF,
+        #                   0x8A, 0xDD, 0xF1, 0x15, 0x30, 0x02  ]
+        #terminals_message = can.Message(arbitration_id=0x12f, data=terminals_data,
+        #                                is_extended_id=False, channel=0)
+        #bus.send(terminals_message)
+
         time.sleep(0.1)
         counter += 1
+        if counter & 0x0F == 0xF:
+            counter += 1  # xF is an invalid counter value
     print(f'Sent {counter} messages in {tx_seconds} seconds ({counter/tx_seconds} msgs/sec)')
+    return get_dtcs(bus)
 
 
 def simple_query(bus, send_data):
