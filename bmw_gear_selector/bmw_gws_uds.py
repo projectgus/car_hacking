@@ -127,6 +127,44 @@ def confirm_working_checksum(bus, message):
     """ Simple function to use the DTCs to check if bmw_3fd_crc() returns correct values """
     return verify_checksum(bus, [bmw_3fd_crc(message)] + message)
 
+
+def find_counter_fields(bus):
+    for byte in range(4):
+        for mask,shift in [ (0xff, 0), (0x0f, 4), (0x0f, 0) ]:
+            for counter in list(range(mask+1)) * 4:
+                payload = [ 0xff, 0xff, 0xff, 0xff ]
+                payload[byte] = counter << shift
+                payload = [ bmw_3fd_crc(payload) ] + payload
+                message = can.Message(arbitration_id=0x3fd, data=payload, is_extended_id=False)
+                #print(message)
+                bus.send(message)
+                time.sleep(0.01)
+
+            time.sleep(0.1)
+
+            dtcs = get_dtcs(bus)
+
+            csum_dtc = dtcs.get('e09402', 'missing')
+            if csum_dtc != 47:
+                print(f'Counter byte {byte} mask {(mask << shift):#x}')
+                print(f'   E09402 -> {csum_dtc}')
+
+
+def send_gws_status(bus, status_bytes, tx_seconds=3):
+    assert len(status_bytes) == 3
+    counter = 0
+    t0 = time.time()
+    while time.time() < t0 + tx_seconds:
+        payload = [ counter & 0x0F ] + status_bytes
+        payload = [ bmw_3fd_crc(payload) ] + payload
+        message = can.Message(arbitration_id=0x3fd, data=payload, is_extended_id=False)
+        #print(message)
+        bus.send(message)
+        time.sleep(0.1)
+        counter += 1
+    print(f'Sent {counter} messages in {tx_seconds} seconds ({counter/tx_seconds} msgs/sec)')
+
+
 def simple_query(bus, send_data):
     txid = 0x7ca
     rxid = 0x7c9
