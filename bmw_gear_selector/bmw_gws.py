@@ -129,10 +129,17 @@ class BMW3FDCRC(crccheck.crc.Crc8Base):
     _initvalue = 0x0
     _xor_output = 0x70
 
-
 def bmw_3fd_crc(message):
     return BMW3FDCRC.calc(message) & 0xFF
 
+class BMW197CRC(crccheck.crc.Crc8Base):
+    """ As above, thanks Colin! """
+    _poly = 0x1D
+    _initvalue = 0x0
+    _xor_output = 0x53
+
+def bmw_197_crc(message):
+    return BMW197CRC.calc(message) & 0xFF
 
 def confirm_working_checksum(bus, message):
     """Simple function to use the DTCs to check if bmw_3fd_crc() returns correct values"""

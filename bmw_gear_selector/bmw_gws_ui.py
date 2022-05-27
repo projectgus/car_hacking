@@ -82,11 +82,13 @@ class MainWindow(QWidget):
         g.addWidget(QLabel("Brightness"), 3, 0)
         g.addWidget(self.brightness, 3, 1)
 
-        status_update = QTimer(self)
-        status_update.timeout.connect(self.can_update)
-        status_update.setInterval(50)
-        status_update.start()
-        self.status_counter = 0
+        self.gear_msg_counter = 0
+        self.status_msg_counter = None
+
+        can_timer = QTimer(self)
+        can_timer.timeout.connect(self.can_update)
+        can_timer.setInterval(50)
+        can_timer.start()
 
         self.update_enabled()
 
@@ -107,6 +109,16 @@ class MainWindow(QWidget):
     def process_incoming_gear_status(self, m):
         self.raw_status.setText(f"IN 0x197 - {m.data.hex()}")
         need_update = False
+
+        if m.data[1] == self.status_msg_counter:
+            print('Repeating counter value!')
+            return
+        self.status_msg_counter = m.data[1]
+
+        calc_csum = bmw_gws.bmw_197_crc(m.data[1:4])
+        if calc_csum != m.data[0]:
+            print(f'{m.data} Invalid checksum. Calculated {calc_csum:#2x} provided {m.data[0]:#2x}')
+            return
 
         lever_pos = m.data[2]
         if lever_pos != self.last_lever_pos:
@@ -184,15 +196,15 @@ class MainWindow(QWidget):
         if self.flashing.isChecked():
             gear_status |= 0x08
 
-        payload = [self.status_counter, gear_status, 0x00, 0x00]
+        payload = [self.gear_msg_counter, gear_status, 0x00, 0x00]
         payload.insert(0, bmw_gws.bmw_3fd_crc(payload))
         gear_msg = can.Message(arbitration_id=0x3FD, data=payload, is_extended_id=False)
         self.last_gear_msg.setText(f"OUT 0x3fd {bytes(payload).hex()}")
         self.bus.send(gear_msg)
 
-        self.status_counter += 1
-        if self.status_counter == 0x0F:
-            self.status_counter = 0  # 0F is not a valid counter value
+        self.gear_msg_counter += 1
+        if self.gear_msg_counter == 0x0F:
+            self.gear_msg_counter = 0  # 0F is not a valid counter value
 
     def brightness_update(self, value):
         print(f"Set brightness {value}")
