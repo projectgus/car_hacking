@@ -60,6 +60,11 @@ class MainWindow(QWidget):
         self.brightness.valueChanged.connect(self.brightness_update)
         self.brightness_update(0)
 
+        brightness_timer = QTimer(self)
+        brightness_timer.timeout.connect(self.brightness_update)
+        brightness_timer.setInterval(250)
+        brightness_timer.start()
+
         left_column = QVBoxLayout()
         for w in [self.park, self.reverse, self.neutral, self.drive, self.flashing]:
             left_column.addWidget(w)
@@ -206,8 +211,11 @@ class MainWindow(QWidget):
         if self.gear_msg_counter == 0x0F:
             self.gear_msg_counter = 0  # 0F is not a valid counter value
 
-    def brightness_update(self, value):
-        print(f"Set brightness {value}")
+    def brightness_update(self, value=None):
+        if value is None:
+            value = self.brightness.value()  # timer callback
+        else:
+            print(f"Set brightness {value}")
         msg = can.Message(arbitration_id=0x202, data=[value, 0], is_extended_id=False)
         self.bus.send(msg)
 
