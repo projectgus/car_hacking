@@ -1,4 +1,9 @@
 #!/usr/bin/env python
+#
+# Copyright 2022 Angus Gratton
+# All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 import can, bmw_gws
 import datetime, sys
 from PySide6.QtCore import (

@@ -6,6 +6,10 @@ import time
 import threading
 import logging
 
+# Copyright 2022 Angus Gratton
+# All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)-15s %(levelname)-8s:%(name)-12s:%(message)s",

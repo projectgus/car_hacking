@@ -1,7 +1,16 @@
 # MicroPython code
 #
-# Send ZF 4HP20 single wire display signals to dash
-# based on Citroen Xantia/XM documentation, tested on Peugeot 406 "D8.5" dash wire 8480
+# Copyright 2022 Angus Gratton
+# All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+#
+# Send ZF 4HP20 compatible single wire display signals to dash with selected
+# gear info.
+#
+# Based on factual protocol description in Citroen Xantia/XM 4HP20 documentation.
+#
+# Tested on a Peugeot 406 "D8.5" auto dash, connected to dash wire 8480 via an NPN
+# transistor.
 
 import time
 import esp32
