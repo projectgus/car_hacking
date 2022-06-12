@@ -84,7 +84,7 @@ class MainWindow(QWidget):
 
         update_balance_timer = QTimer(self)
         update_balance_timer.timeout.connect(self.update_balance)
-        update_balance_timer.setInterval(250)
+        update_balance_timer.setInterval(400)
         update_balance_timer.start()
 
 
