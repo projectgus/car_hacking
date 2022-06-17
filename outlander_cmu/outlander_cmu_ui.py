@@ -13,6 +13,7 @@ from PySide6.QtCore import (
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
+    QFileDialog,
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -65,15 +66,19 @@ class MainWindow(QWidget):
         self.balance_voltage = QLineEdit("3.600")
         self.balance_voltage.setInputMask("9.900")
 
+        save_voltages = QPushButton("Save Voltages")
+        save_voltages.clicked.connect(self.save_voltages)
+
         controls = QVBoxLayout()
-        for w in [self.enable_balance, self.force_balance, self.balance_voltage]:
+        for w in [self.enable_balance, self.force_balance, self.balance_voltage, save_voltages]:
             controls.addWidget(w)
+        controls.addStretch(1)
 
-        self.module_layout = QHBoxLayout()
-        self.module_layout.addLayout(controls)
-        self.setLayout(self.module_layout)
-
-        self.setFixedWidth(400)
+        top_level_layout = QHBoxLayout()
+        top_level_layout.addLayout(controls)
+        self.module_layout = QGridLayout()
+        top_level_layout.addLayout(self.module_layout)
+        self.setLayout(top_level_layout)
 
         self.panels = {}
 
@@ -93,12 +98,14 @@ class MainWindow(QWidget):
             msg = self.bus.recv(0)
             if not msg:
                 return
-            print(msg)
+            #print(msg)
             if 0x600 <= msg.arbitration_id < 0x700:
                 cmu_id = (msg.arbitration_id & 0xf0) >> 4  # indexing from 1, same as Mitsubishi does
                 if cmu_id not in self.panels:
+                    row = len(self.panels) % 2
+                    col = len(self.panels) // 2
                     self.panels[cmu_id] = CMUPanel(cmu_id)
-                    self.module_layout.addWidget(self.panels[cmu_id])
+                    self.module_layout.addWidget(self.panels[cmu_id], row, col)
                 panel = self.panels[cmu_id]
                 panel.update(msg)
 
@@ -112,8 +119,17 @@ class MainWindow(QWidget):
 
         txdata = struct.pack(">HBBBxxx", int(balance_voltage * 1000), balance_level, 4, 3)  # 4,3 are magic numbers???
         txmsg = can.Message(arbitration_id=0x3c3, data=txdata, is_extended_id=False)
-        print(txmsg)
+        #print(txmsg)
         self.bus.send(txmsg)
+
+    def save_voltages(self):
+        filename = QFileDialog.getSaveFileName(self, "Save Voltages Summary",
+                                               filter="Text Files (*.txt)")
+        with open(filename[0], "w") as f:
+            for k in sorted(self.panels):
+                p = self.panels[k]
+                p.cmu.print(f)
+                f.write("\n")
 
 
 if __name__ == "__main__":

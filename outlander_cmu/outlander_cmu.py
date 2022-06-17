@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import can
 import time
+import sys
 import struct
 import datetime
 
@@ -11,7 +12,7 @@ import datetime
 class CMU(object):
     def __init__(self, cmu_id):
         self.cmu_id = cmu_id
-        self.byte1 = None  # what is this?
+        self.byte1 = -1
         self.balancing = [ False ] * 8
         self.voltages = [ -1 ] * 8
         self.temps = [ -1 ] * 3
@@ -37,15 +38,15 @@ class CMU(object):
             raise RuntimeError(f"Invalid arbitration_id {msg.arbitration_id}")
         self.last_update = datetime.datetime.now()
 
-    def print(self):
-        print(f'CMU ID {self.cmu_id} - last updated {self.last_update}')
-        print(f'Byte 1 {self.byte1}')
-        print(f'Temps {self.temps[0]} {self.temps[1]} {self.temps[2]}')
-        print('Voltages:')
+    def print(self, file=sys.stdout):
+        print(f'CMU ID {self.cmu_id} - last updated {self.last_update}', file=file)
+        print(f'Byte 1 {self.byte1}' ,file=file)
+        print(f'Temps {self.temps[0]} {self.temps[1]} {self.temps[2]}', file=file)
+        print('Voltages:', file=file)
         for v,b in zip(self.voltages, self.balancing):
             msg = "Balancing" if b else ""
-            print(f'{v} {msg}')
-        print(f'Module voltage {sum(self.voltages):.3f}')
+            print(f'{v} {msg}', file=file)
+        print(f'Module voltage {sum(self.voltages):.3f}', file=file)
 
 def test_cmu(bus):
     txmsg = can.Message(arbitration_id=0x3c3, data=[0,0,0,0,0,0,0,0],
