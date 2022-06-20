@@ -19,10 +19,9 @@ logging.basicConfig(
 
 # Reference https://gist.github.com/brandonros/4aa6ae51d0f925671d034446947df555
 
-
 def hard_reset_simple(bus):
     # arbitration ID encodes sender '0xf1' (tester), destination is in first data byte - 5e for GWS, can also use 0xdf for broadcast
-    # then send 2 byte UDS payload 0x11 0x01. response comes via arbitration ID 0x65
+    # then send 2 byte UDS payload 0x11 0x01. response comes via arbitration ID 0x65e
     broadcast_msg = can.Message(
         arbitration_id=0x6F1, data=b"\x5e\x02\x11\x01", is_extended_id=False
     )
@@ -95,9 +94,9 @@ def search_valid_checksums(bus):
                 dtcs = get_dtcs(bus)
 
                 csum_dtc = dtcs.get("e09404", "missing")
-                if csum_dtc != 47:
+                if csum_dtc != 0x2f:
                     print(f"Message {message}")
-                    print(f"   E09404 -> {csum_dtc}")
+                    print(f"   E09404 -> {csum_dtc:#x}")
 
 
 def verify_checksum(bus, payload):
@@ -111,7 +110,7 @@ def verify_checksum(bus, payload):
 
     dtcs = get_dtcs(bus)
     csum_dtc = dtcs.get("e09404", "missing")
-    return csum_dtc == 46
+    return csum_dtc == 0x2e
 
 
 def find_checksum(bus, message):
@@ -169,9 +168,9 @@ def find_counter_fields(bus):
             dtcs = get_dtcs(bus)
 
             csum_dtc = dtcs.get("e09402", "missing")
-            if csum_dtc != 47:
+            if csum_dtc != 0x2f:
                 print(f"Counter byte {byte} mask {(mask << shift):#x}")
-                print(f"   E09402 -> {csum_dtc}")
+                print(f"   E09402 -> {csum_dtc:#x}")
 
 
 def send_gws_status(bus, status_bytes, tx_seconds=3):
