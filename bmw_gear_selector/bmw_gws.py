@@ -176,11 +176,6 @@ def find_counter_fields(bus):
 def send_gws_status(bus, status_bytes, tx_seconds=3):
     assert len(status_bytes) == 3
 
-    brightness = 0x40
-    dimming_message = can.Message(
-        arbitration_id=0x202, data=[brightness, 0], is_extended_id=False, channel=0
-    )
-
     counter = 0
     t0 = time.time()
     last_clock = 0
@@ -191,7 +186,6 @@ def send_gws_status(bus, status_bytes, tx_seconds=3):
         print(message)
         message.channel = 0
         bus.send(message)
-        bus.send(dimming_message)
 
         time.sleep(0.1)
         counter += 1
