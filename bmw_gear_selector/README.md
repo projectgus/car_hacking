@@ -2,7 +2,12 @@
 
 Some *experimental* Python code for controlling the gear selector ("GWS") in some recent model BMWs (F series, G? series, etc).
 
-The gear lever used here is from a 2014 BMW F20 1 Series (125i) LCI, VIN WBA1S320X05E77714. Marked "GW 9 296 899-01", "100999952-00" (back) and "1009972-00" (side). May or may not apply to the many similar levers in other models...
+For full story see these blog posts:
+
+* [BMW F Series Gear Selector Part One: Failures](https://www.projectgus.com/2022/06/bmw-f-series-gear-selector-part-one-failures/)
+* [BMW F Series Gear Selector Part Two: Breakthrough](https://www.projectgus.com/2022/06/bmw-f-series-gear-selector-part-two-breakthrough/)
+
+The gear lever used here is from a 2014 BMW F20 1 Series (125i) LCI, VIN WBA1S320X05E77714. Marked "GW 9 296 899-01", "100999952-00" (back) and "1009972-00" (side). Code may or may not work with the many similar levers in other models...
 
 `python-can` needs to be installed and configured to use any of these.
 
