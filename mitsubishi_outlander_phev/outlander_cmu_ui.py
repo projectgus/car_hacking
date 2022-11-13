@@ -4,8 +4,9 @@
 # All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
-import can, outlander_cmu
-import datetime, sys, struct
+import can, outlander_cmu, cmu_renumber
+import datetime, sys, struct, time
+import serial.tools.list_ports
 from PySide6.QtCore import (
     QTimer,
     Qt,
@@ -13,9 +14,11 @@ from PySide6.QtCore import (
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
+    QComboBox,
     QFileDialog,
     QFrame,
     QGridLayout,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -54,6 +57,59 @@ class CMUPanel(QWidget):
             w.setText(f"{i}: {v:.3f} V {bmsg}")
 
 
+class RenumberGroup(QGroupBox):
+    def __init__(self):
+        super().__init__("Renumber IDs")
+
+        layout = QVBoxLayout()
+        self.setLayout(layout)
+
+        self.first_id = QLineEdit("01")
+        self.first_id.setInputMask("99") # 2 digits
+
+        self.port_sel = QComboBox()
+        for p in serial.tools.list_ports.comports(True):
+            self.port_sel.addItem(p.device)
+
+        self.status = QLabel("")
+        self.status.setWordWrap(True)
+
+        button = QPushButton("Renumber")
+        button.clicked.connect(self.on_renumber)
+
+        for w in [QLabel("First ID"), self.first_id,
+                  QLabel("Serial port"), self.port_sel,
+                  button,
+                  self.status]:
+            layout.addWidget(w)
+
+    def on_renumber(self):
+        self.status.setText("")
+        def msg(text):
+            print(text)
+            self.status.setText(self.status.text() + "\n" + text)
+        port = self.port_sel.currentText()
+        first_id = int(self.first_id.text())
+        msg("Using port {} first ID {:#x}\n".format(port, first_id))
+        try:
+            with cmu_renumber.open_port(port) as port:
+                pkt = cmu_renumber.renumber_packet_starting_from(first_id)
+                msg("Write: {}".format(pkt.hex()))
+                port.write(pkt)
+                r = port.read(5)
+                if r:
+                    msg("Read: {}".format(r.hex()))
+                    kept, new = cmu_renumber.decode_result_packet(r)
+                    def list_ids(ids):
+                        return ", ".join(str(x) for x in ids)
+                    msg("Kept IDs: {}\nNew IDs: {}".format(list_ids(kept), list_ids(new)))
+                else:
+                    msg("Timeout, try again?")
+        except RuntimeError as e:
+            msg(str(e))
+            raise
+
+
 class MainWindow(QWidget):
     def __init__(self, bus):
         super().__init__(None)
@@ -61,16 +117,25 @@ class MainWindow(QWidget):
         self.setWindowTitle("CMU Tests")
         self.bus = bus
 
+        balance_group = QGroupBox("Balancing")
+        balance_layout = QVBoxLayout()
+        balance_group.setLayout(balance_layout)
+
         self.enable_balance = QCheckBox("Enable Balancing")
         self.force_balance = QCheckBox("Force Balance On")
         self.balance_voltage = QLineEdit("3.600")
         self.balance_voltage.setInputMask("9.900")
 
+        for w in [self.enable_balance, self.force_balance, self.balance_voltage]:
+            balance_layout.addWidget(w)
+
         save_voltages = QPushButton("Save Voltages")
         save_voltages.clicked.connect(self.save_voltages)
 
+        renumber_group = RenumberGroup()
+
         controls = QVBoxLayout()
-        for w in [self.enable_balance, self.force_balance, self.balance_voltage, save_voltages]:
+        for w in [balance_group, save_voltages, renumber_group]:
             controls.addWidget(w)
         controls.addStretch(1)
 
@@ -87,11 +152,10 @@ class MainWindow(QWidget):
         can_timer.setInterval(50)
         can_timer.start()
 
-        update_balance_timer = QTimer(self)
-        update_balance_timer.timeout.connect(self.update_balance)
-        update_balance_timer.setInterval(400)
-        update_balance_timer.start()
-
+        self.update_tx_timer = QTimer(self)
+        self.update_tx_timer.timeout.connect(self.update_tx_cb)
+        self.update_tx_timer.setInterval(40)
+        self.update_tx_timer.start()
 
     def can_update(self):
         for _ in range (10):
@@ -109,18 +173,14 @@ class MainWindow(QWidget):
                 panel = self.panels[cmu_id]
                 panel.update(msg)
 
-    def update_balance(self):
+    def update_tx_cb(self):
         balance_voltage = float(self.balance_voltage.text())
-        balance_level = 0
-        if self.force_balance.isChecked():
-            balance_level = 2  # https://www.diyelectriccar.com/threads/mitsubishi-miev-can-data-snooping.179577/page-2#post-1066826
-        elif self.enable_balance.isChecked():
-            balance_level = 1
-
-        txdata = struct.pack(">HBBBxxx", int(balance_voltage * 1000), balance_level, 4, 3)  # 4,3 are magic numbers???
-        txmsg = can.Message(arbitration_id=0x3c3, data=txdata, is_extended_id=False)
-        #print(txmsg)
+        txmsg = outlander_cmu.can_balance_msg(balance_voltage,
+                                              self.enable_balance.isChecked(),
+                                              self.force_balance.isChecked())
         self.bus.send(txmsg)
+        #print(txmsg)
+
 
     def save_voltages(self):
         filename = QFileDialog.getSaveFileName(self, "Save Voltages Summary",

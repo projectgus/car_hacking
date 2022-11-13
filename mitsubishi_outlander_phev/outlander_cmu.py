@@ -48,22 +48,31 @@ class CMU(object):
             print(f'{v} {msg}', file=file)
         print(f'Module voltage {sum(self.voltages):.3f}', file=file)
 
-def test_cmu(bus):
+
+def can_balance_msg(balance_voltage=0.0, enable_balance=False, force_balance=False):
+    if force_balance:
+        # https://www.diyelectriccar.com/threads/mitsubishi-miev-can-data-snooping.179577/page-2#post-1066826
+        balance_level = 2
+    elif enable_balance:
+        balance_level = 1
+    else:
+        balance_level = 0
+    txdata = struct.pack(">HBBBxxx", int(balance_voltage * 1000) if enable_balance else 0xf3d,
+                         balance_level,
+                         4, 3)  # last two are magic numbers, some code uses 4,3 here???
+    return can.Message(arbitration_id=0x3c3, data=txdata, is_extended_id=False)
+
+
+def test_cmu(bus, balance_to_min=False):
     txmsg = can.Message(arbitration_id=0x3c3, data=[0,0,0,0,0,0,0,0],
                         is_extended_id=False)
     last_tx = time.time()
-    last_print = 0.0
+    last_print = datetime.datetime.now()
     cmus = {}
     while True:
-        if cmus and time.time() - last_tx > 1.0:
+        if cmus and time.time() - last_tx > 0.040:
             balance_voltage = min(min(cmu.voltages) for cmu in cmus.values())
-            if balance_voltage > 0:
-                balance_voltage = 3.6
-                txmsg.data = struct.pack(">HBBBxxx", int(balance_voltage * 1000), 0, 4, 3)  # 4,3 are magic numbers?
-                print(f"Balance to {balance_voltage}    {txmsg}")
-            else:
-                txmsg.data = [ 0 ] * 8
-            assert len(txmsg.data) == 8
+            txmsg = can_balance_msg(balance_voltage, balance_to_min)
             bus.send(txmsg)
             last_tx = time.time()
         msg = bus.recv(0)
@@ -74,10 +83,12 @@ def test_cmu(bus):
             cmus[cmu_id].update(msg)
         elif msg:
             print(msg)
-        if time.time() - last_print > 2.0:
+        PRINT_EVERY = datetime.timedelta(seconds=1)
+        if datetime.datetime.now() - last_print > PRINT_EVERY:
             for cmu in cmus.values():
-                cmu.print()
-            last_print = time.time()
+                if cmu.last_update > last_print:
+                    cmu.print()
+            last_print = datetime.datetime.now()
 
 
 
