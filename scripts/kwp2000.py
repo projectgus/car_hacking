@@ -7,7 +7,7 @@ import struct
 from enum import IntEnum
 
 import can
-from isotp import Session
+from iso_session import Session
 
 class NegativeResponseError(Exception):
     def __init__(self, message, service_id, error_code):
@@ -35,7 +35,7 @@ class SERVICE_TYPE(IntEnum):
     READ_DIAGNOSTIC_TROUBLE_CODES = 0x13
     CLEAR_DIAGNOSTIC_INFORMATION = 0x14
     READ_STATUS_OF_DIAGNOSTIC_TROUBLE_CODES = 0x17
-    READ_DIAGNOSITC_TROUBE_CODES_BY_STATUS = 0x18
+    READ_DIAGNOSTIC_TROUBLE_CODES_BY_STATUS = 0x18
     READ_ECU_IDENTIFICATION = 0x1A
     STOP_DIAGNOSTIC_SESSION = 0x20
     READ_DATA_BY_LOCAL_IDENTIFIER = 0x21
@@ -186,6 +186,20 @@ class KWP2000Client:
     def diagnostic_session_control(self, session_type: SESSION_TYPE):
         self._kwp(SERVICE_TYPE.DIAGNOSTIC_SESSION_CONTROL, subfunction=session_type)
 
+    def read_diagnostic_trouble_codes(self):
+        # There is an optional groupOfDTC parameter, but not bothering to pass it
+
+        # TODO: decode result!
+        return self._kwp(SERVICE_TYPE.READ_DIAGNOSTIC_TROUBLE_CODES)
+
+    def read_status_of_diagnostic_trouble_codes(self):
+        # TODO: decode result!
+        return self._kwp(SERVICE_TYPE.READ_STATUS_OF_DIAGNOSTIC_TROUBLE_CODES)
+
+    def read_diagnostic_trouble_codes_by_status(self, status: int):
+        # TODO: decode result!
+        return self._kwp(SERVICE_TYPE.READ_DIAGNOSTIC_TROUBLE_CODES_BY_STATUS, status)
+
     def security_access(self, access_type: ACCESS_TYPE, security_key: bytes = b""):
         request_seed = access_type % 2 != 0
 
@@ -262,12 +276,16 @@ class KWP2000Client:
 
 
 if __name__ == "__main__":
-    p = Panda()
-    p.can_clear(0xFFFF)
-    p.set_safety_mode(Panda.SAFETY_ALLOUTPUT)
+    bus = can.Bus()
+    debug = True
 
-    tp20 = TP20Transport(p, 0x9, debug=False)
-    kwp_client = KWP2000Client(tp20, debug=True)
+    txid = int(sys.argv[1], 0)
+    rxid = txid - 8
+    if debug:
+        print("TXID {:#x} RXID {:#x}".format(txid, rxid))
+    tp = Session(bus, txid, rxid)
+
+    kwp_client = KWP2000Client(tp, debug=debug)
     kwp_client.diagnostic_session_control(SESSION_TYPE.DIAGNOSTIC)
 
     ident = kwp_client.read_ecu_identifcation(ECU_IDENTIFICATION_TYPE.ECU_IDENT)
