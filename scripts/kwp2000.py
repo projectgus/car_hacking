@@ -6,9 +6,8 @@
 import struct
 from enum import IntEnum
 
-from panda import Panda  # type: ignore
-from tp20 import TP20Transport
-
+import can
+from isotp import Session
 
 class NegativeResponseError(Exception):
     def __init__(self, message, service_id, error_code):
@@ -128,7 +127,7 @@ _negative_response_codes = {
 
 
 class KWP2000Client:
-    def __init__(self, transport: TP20Transport, debug: bool = False):
+    def __init__(self, transport : Session, debug: bool = False):
         self.transport = transport
         self.debug = debug
 
@@ -143,13 +142,12 @@ class KWP2000Client:
         if self.debug:
             print(f"KWP TX: {req.hex()}")
 
-        self.transport.send(req)
-        resp = self.transport.recv()
+        resp = self.transport.request(req)
 
         if self.debug:
-            print(f"KWP RX: {resp.hex()}")
+            print(f"KWP RX: {resp.hex() if resp else None}")
 
-        resp_sid = resp[0] if len(resp) > 0 else None
+        resp_sid = resp[0] if resp else None
 
         # negative response
         if resp_sid == 0x7F:
