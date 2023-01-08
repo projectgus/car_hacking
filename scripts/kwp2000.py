@@ -4,10 +4,12 @@
 # Original Copyright (c) 2021 Willem Melching
 # SPDX-License-Identifier: MIT
 import struct
+import sys
 from enum import IntEnum
 
 import can
 from iso_session import Session
+
 
 class NegativeResponseError(Exception):
     def __init__(self, message, service_id, error_code):
@@ -25,6 +27,10 @@ class InvalidServiceIdError(Exception):
 
 
 class InvalidSubFunctionError(Exception):
+    pass
+
+
+class TimeoutError(RuntimeError):
     pass
 
 
@@ -127,11 +133,13 @@ _negative_response_codes = {
 
 
 class KWP2000Client:
-    def __init__(self, transport : Session, debug: bool = False):
+    def __init__(self, transport: Session, debug: bool = False):
         self.transport = transport
         self.debug = debug
 
-    def _kwp(self, service_type: SERVICE_TYPE, subfunction: int = None, data: bytes = None) -> bytes:
+    def _kwp(
+        self, service_type: SERVICE_TYPE, subfunction: int = None, data: bytes = None
+    ) -> bytes:
         req = bytes([service_type])
 
         if subfunction is not None:
@@ -142,7 +150,11 @@ class KWP2000Client:
         if self.debug:
             print(f"KWP TX: {req.hex()}")
 
-        resp = self.transport.request(req)
+        with self.transport as t:
+            resp = t.request(req)
+
+        if resp is None:
+            raise TimeoutError(f"No response to request {req.hex()}")
 
         if self.debug:
             print(f"KWP RX: {resp.hex() if resp else None}")
@@ -152,6 +164,9 @@ class KWP2000Client:
         # negative response
         if resp_sid == 0x7F:
             service_id = resp[1] if len(resp) > 1 else -1
+
+            if service_id != service_type:
+                raise InvalidServiceIdError(f"invalid negative response service id: {service_id:#x} - expected {service_type:#x}")
 
             try:
                 service_desc = SERVICE_TYPE(service_id).name
@@ -163,14 +178,18 @@ class KWP2000Client:
             try:
                 error_desc = _negative_response_codes[error_code]
             except BaseException:
-                error_desc = resp[3:].hex()
+                error_desc = resp[2:].hex()
 
-            raise NegativeResponseError("{} - {}".format(service_desc, error_desc), service_id, error_code)
+            raise NegativeResponseError(
+                "{} - {}".format(service_desc, error_desc), service_id, error_code
+            )
 
         # positive response
         if service_type + 0x40 != resp_sid:
             resp_sid_hex = hex(resp_sid) if resp_sid is not None else None
-            raise InvalidServiceIdError("invalid response service id: {}".format(resp_sid_hex))
+            raise InvalidServiceIdError(
+                "invalid response service id: {}".format(resp_sid_hex)
+            )
 
         # check subfunction
         if subfunction is not None:
@@ -178,10 +197,12 @@ class KWP2000Client:
 
             if subfunction != resp_sfn:
                 resp_sfn_hex = hex(resp_sfn) if resp_sfn is not None else None
-                raise InvalidSubFunctionError(f"invalid response subfunction: {resp_sfn_hex:x}")
+                raise InvalidSubFunctionError(
+                    f"invalid response subfunction: {resp_sfn_hex:x}"
+                )
 
         # return data (exclude service id and sub-function id)
-        return resp[(1 if subfunction is None else 2) :]
+        return resp[(1 if subfunction is None else 2):]
 
     def diagnostic_session_control(self, session_type: SESSION_TYPE):
         self._kwp(SERVICE_TYPE.DIAGNOSTIC_SESSION_CONTROL, subfunction=session_type)
@@ -194,11 +215,17 @@ class KWP2000Client:
 
     def read_status_of_diagnostic_trouble_codes(self):
         # TODO: decode result!
-        return self._kwp(SERVICE_TYPE.READ_STATUS_OF_DIAGNOSTIC_TROUBLE_CODES)
+        #
+        # on kona only txid 0x7a8 seems to see this packet, and doesn't seem to really respond?
+        return self._kwp(
+            SERVICE_TYPE.READ_STATUS_OF_DIAGNOSTIC_TROUBLE_CODES, data=b"\x00\x00"
+        )
 
     def read_diagnostic_trouble_codes_by_status(self, status: int):
         # TODO: decode result!
-        return self._kwp(SERVICE_TYPE.READ_DIAGNOSTIC_TROUBLE_CODES_BY_STATUS, status)
+        return self._kwp(
+            SERVICE_TYPE.READ_DIAGNOSTIC_TROUBLE_CODES_BY_STATUS, data=b"\x00\x80\x00"
+        )  # 008000, 20ff00, 60ff00, 004000  also work on Kona
 
     def security_access(self, access_type: ACCESS_TYPE, security_key: bytes = b""):
         request_seed = access_type % 2 != 0
@@ -208,7 +235,9 @@ class KWP2000Client:
         if not request_seed and len(security_key) == 0:
             raise ValueError("security_key is missing")
 
-        return self._kwp(SERVICE_TYPE.SECURITY_ACCESS, subfunction=access_type, data=security_key)
+        return self._kwp(
+            SERVICE_TYPE.SECURITY_ACCESS, subfunction=access_type, data=security_key
+        )
 
     def read_ecu_identifcation(self, data_identifier_type: ECU_IDENTIFICATION_TYPE):
         return self._kwp(SERVICE_TYPE.READ_ECU_IDENTIFICATION, data_identifier_type)
@@ -236,11 +265,19 @@ class KWP2000Client:
         else:
             raise ValueError(f"Invalid response {ret.hex()}")
 
-    def start_routine_by_local_identifier(self, routine_control: ROUTINE_CONTROL_TYPE, data: bytes) -> bytes:
-        return self._kwp(SERVICE_TYPE.START_ROUTINE_BY_LOCAL_IDENTIFIER, routine_control, data)
+    def start_routine_by_local_identifier(
+        self, routine_control: ROUTINE_CONTROL_TYPE, data: bytes
+    ) -> bytes:
+        return self._kwp(
+            SERVICE_TYPE.START_ROUTINE_BY_LOCAL_IDENTIFIER, routine_control, data
+        )
 
-    def request_routine_results_by_local_identifier(self, routine_control: ROUTINE_CONTROL_TYPE) -> bytes:
-        return self._kwp(SERVICE_TYPE.REQUEST_ROUTINE_RESULTS_BY_LOCAL_IDENTIFIER, routine_control)
+    def request_routine_results_by_local_identifier(
+        self, routine_control: ROUTINE_CONTROL_TYPE
+    ) -> bytes:
+        return self._kwp(
+            SERVICE_TYPE.REQUEST_ROUTINE_RESULTS_BY_LOCAL_IDENTIFIER, routine_control
+        )
 
     def erase_flash(self, start_address: int, end_address: int) -> bytes:
         if start_address > 0xFFFFFF:
@@ -250,9 +287,13 @@ class KWP2000Client:
 
         start = struct.pack(">L", start_address)[1:]
         end = struct.pack(">L", end_address)[1:]
-        return self.start_routine_by_local_identifier(ROUTINE_CONTROL_TYPE.ERASE_FLASH, start + end)
+        return self.start_routine_by_local_identifier(
+            ROUTINE_CONTROL_TYPE.ERASE_FLASH, start + end
+        )
 
-    def calculate_flash_checksum(self, start_address: int, end_address: int, checksum: int) -> bytes:
+    def calculate_flash_checksum(
+        self, start_address: int, end_address: int, checksum: int
+    ) -> bytes:
         if start_address > 0xFFFFFF:
             raise ValueError(f"invalid start_address {start_address}")
         if end_address > 0xFFFFFF:
@@ -263,7 +304,9 @@ class KWP2000Client:
         start = struct.pack(">L", start_address)[1:]
         end = struct.pack(">L", end_address)[1:]
         chk = struct.pack(">H", checksum)
-        return self.start_routine_by_local_identifier(ROUTINE_CONTROL_TYPE.CALCULATE_FLASH_CHECKSUM, start + end + chk)
+        return self.start_routine_by_local_identifier(
+            ROUTINE_CONTROL_TYPE.CALCULATE_FLASH_CHECKSUM, start + end + chk
+        )
 
     def transfer_data(self, data: bytes) -> bytes:
         return self._kwp(SERVICE_TYPE.TRANSFER_DATA, data=data)
@@ -275,21 +318,55 @@ class KWP2000Client:
         return self._kwp(SERVICE_TYPE.STOP_COMMUNICATION)
 
 
-if __name__ == "__main__":
-    bus = can.Bus()
-    debug = True
-
-    txid = int(sys.argv[1], 0)
-    rxid = txid - 8
+def main(bus, txid, debug=True):
+    rxid = txid + 8
     if debug:
         print("TXID {:#x} RXID {:#x}".format(txid, rxid))
     tp = Session(bus, txid, rxid)
 
     kwp_client = KWP2000Client(tp, debug=debug)
-    kwp_client.diagnostic_session_control(SESSION_TYPE.DIAGNOSTIC)
 
-    ident = kwp_client.read_ecu_identifcation(ECU_IDENTIFICATION_TYPE.ECU_IDENT)
-    print(f"Part Number {ident[:10]}")
+    kwp_client._kwp(SERVICE_TYPE.ECU_RESET, 0x02)
 
-    status = kwp_client.read_ecu_identifcation(ECU_IDENTIFICATION_TYPE.STATUS_FLASH)
-    print("Flash status", status)
+    # seems happy with 0x81 ("Default Session" and 0x90 ("ECU Passive Session")
+    kwp_client.diagnostic_session_control(0x81)
+
+    # ident = kwp_client.read_ecu_identifcation(ECU_IDENTIFICATION_TYPE.ECU_IDENT)
+    # print(f"Part Number {ident[:10]}")
+
+    for d in range(0xFFFF + 1):
+        kwp_client.diagnostic_session_control(0x81)
+        try:
+            resp = kwp_client._kwp(0x17, data=struct.pack("<H", d))
+            print(f"OK! d={d:#x}, {resp.hex()}")
+        except Exception as e:
+            if "invalidFormat" not in str(e):
+                print(e)
+    print("Done?")
+
+    try:
+        resp = kwp_client.read_diagnostic_trouble_codes_by_status(0x80)
+        print(resp.hex())
+    except Exception as e:
+        print(e)
+
+    try:
+        resp = kwp_client.read_diagnostic_trouble_codes()
+        print(resp.hex())
+    except Exception as e:
+        print(e)
+
+    try:
+        resp = kwp_client.read_status_of_diagnostic_trouble_codes()
+        print(resp.hex())
+    except Exception as e:
+        print(e)
+
+    # status = kwp_client.read_ecu_identifcation(ECU_IDENTIFICATION_TYPE.STATUS_FLASH)
+    # print("Flash status", status)
+
+
+if __name__ == "__main__":
+    bus = can.Bus()
+    debug = True
+    main(bus, int(sys.argv[1], 0), debug)
