@@ -4,32 +4,40 @@
 # Hyundai Kona Shift Select Switch (SBW)
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-# SPDX-FileCopyrightText: 2021 Angus Gratton
+# SPDX-FileCopyrightText: 2023 Angus Gratton
 import can
 import time
+
 
 def main():
     bus = can.Bus(channels=0, baudrate=500_000)
     last_tx = time.time()
 
-    cur_gear = 'P'
+    cur_gear = "P"
 
     last_counter = 0
     last_rx = None
 
     while True:
-        # flush any received messages to the console
+        # Receive any status message from SBW
         m = bus.recv(0.010)
-        if m:
+        if m and m.arbitration_id == 0x354:
             # look for a change, excluding the final counter byte
             if m.data[:7] != last_rx:
                 last_rx = m.data[:7]
                 counter = m.data[7]
                 if last_counter == counter:
-                    print(f"WARNING: payload changed, counter didn't! {m}")
+                    print(f"WARNING: payload changed, counter didn't! {m.data}")
                 last_counter = counter
 
                 # Decode any button that's pressed
+                #
+                # It's not clear exactly what the significance of these 3 bytes
+                # is. I think the signal is repeated in bytes 0 and 2 for
+                # redundancy, and byte 1 is always 0x0A. At least, only these
+                # discrete 3 byte sequences plus a few isolated samples of
+                # a80a57 appear in any of the logs I have. That last rare
+                # sequence might appear during power-on sequence.
                 gear_select_momentary = m.data[:3].hex()
                 pressed = {
                     "aa0a55": "None",
@@ -37,43 +45,45 @@ def main():
                     "a60a59": "R",
                     "9a0a65": "N",
                     "6a0a95": "D",
-                    }.get(gear_select_momentary,
-                          f"UNKNOWN {gear_select_momentary} {m}")
+                }.get(gear_select_momentary, f"UNKNOWN {gear_select_momentary} {m}")
                 displayed = m.data[5]
+
                 # Note: different order to the EPCU's order for these
-                displayed = {
-                    0: 'None',
-                    1: 'P',
-                    2: 'R',
-                    3: 'N',
-                    4: 'D'}.get(displayed, displayed)
-                print(f'Pressed: {pressed} Displayed: {displayed}')
+                displayed = {0: "None", 1: "P", 2: "R", 3: "N", 4: "D"}.get(
+                    displayed, displayed
+                )
+                print(f"Pressed: {pressed} Displayed: {displayed}")
 
                 # Go direct to the new gear, if there is one
-                if pressed in ('P', 'R', 'N', 'D'):
+                if pressed in ("P", "R", "N", "D"):
                     cur_gear = pressed
 
         # Send the status ID 0x200 at approx 100Hz
         if time.time() - last_tx > 0.01:
             current_gear = {
-                'P': 0x00,
-                'D': 0x05 << 3,
-                'N': 0x06 << 3,
-                'R': 0x07 << 3,
+                "P": 0x00,
+                "D": 0x05 << 3,
+                "N": 0x06 << 3,
+                "R": 0x07 << 3,
             }[cur_gear]
 
-            msg = can.Message(arbitration_id=0x200,
-                              is_extended_id=False,
-                              data=bytes([0x00,
-                                          current_gear,
-                                          0x00,
-                                          0x00,
-                                          0x00,
-                                          # upper two bits of last byte
-                                          # look a lot like a counter field,
-                                          # but SBW seems to ignore them! lol
-                                          0x00,
-                                          ]))
+            msg = can.Message(
+                arbitration_id=0x200,
+                is_extended_id=False,
+                data=bytes(
+                    [
+                        0x00,
+                        current_gear,
+                        0x00,
+                        0x00,
+                        0x00,
+                        # upper two bits of last byte
+                        # look a lot like a counter field,
+                        # but SBW seems to ignore them! lol
+                        0x00,
+                    ]
+                ),
+            )
             bus.send(msg)
             last_tx = time.time()
 
