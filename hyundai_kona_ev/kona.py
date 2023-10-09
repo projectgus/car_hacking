@@ -12,6 +12,9 @@ KNOWN_TXIDS = [
 
     # some names are from "Kona PIDs" spreadsheet at
     # https://docs.google.com/spreadsheets/d/1-9jZafV9eZeBUnPQo7qQHbX2-_4qZfWfRVpidoF1owA/edit#gid=660740603
+    #
+    # and ones with "?" are from Kia e-Niro at
+    # https://docs.google.com/spreadsheets/d/1eT2R8hmsD1hC__9LtnkZ3eDjLcdib9JR-3Myc97jy8M/edit#gid=587742707
 
     (0x725, '?725'),  # always available, No READ_DIAGNOSTIC_TROUBLE_CODES_BY_STATUS
     (0x733, '?733'),  # not available in Off(awake), responds to tester present
@@ -21,13 +24,13 @@ KNOWN_TXIDS = [
     (0x783, '?783'),  # always available
     (0x796, '?796'),  # not available in Off(awake)
     (0x7a0, 'BCM'),   # always available
-    (0x7a5, '?7a5'),  # always available, No READ_DIAGNOSTIC_TROUBLE_CODES_BY_STATUS
+    (0x7a5, 'SMK?'),  # always available, No READ_DIAGNOSTIC_TROUBLE_CODES_BY_STATUS
     (0x7b3, 'AC'),    # not available in Off(awake), No READ_DIAGNOSTIC_TROUBLE_CODES_BY_STATUS
-    (0x7b6, '?7b6'),  # always available 
-    (0x7b7, '?7b7'),  # not available in Off(awake), No READ_DIAGNOSTIC_TROUBLE_CODES_BY_STATUS
-    (0x7c4, '?7c4'),  # not available in Off(Awake)
+    (0x7b6, '?7b6?'),  # always available
+    (0x7b7, 'BSD?'),  # not available in Off(awake), No READ_DIAGNOSTIC_TROUBLE_CODES_BY_STATUS, , blind spot detector (maybe)
+    (0x7c4, 'MFC'),  # not available in Off(Awake), multi-function camera (maybe)
     (0x7c6, 'Cluster'),  # always available, no diagnostic session response, tester present is OK
-    (0x7d1, 'ABS ESP'),  # always available
+    (0x7d1, 'ABS ESP'),  # always available, aka IEB module
     (0x7d2, '?7d2'),  # not available in Off(Awake)
     (0x7d4, 'speed?'),  # not available in Off(Awake), unit is named "speed" in Kona PIDs spreadsheet???
     (0x7e2, 'VCU'),  # always available, READ_DIAGNOSTIC_TROUBLE_CODES_BY_STATUS(3 bytes) works
