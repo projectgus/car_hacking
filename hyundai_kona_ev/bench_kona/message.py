@@ -9,6 +9,7 @@ PCAN_CH = 0
 
 DEFAULT_CHANNEL = PCAN_CH
 
+
 class PeriodicMessage(can.Message):
     """Periodic transmitted CAN message.
 
@@ -16,6 +17,7 @@ class PeriodicMessage(can.Message):
 
     def __init__(
         self,
+        car,
         arbitration_id: int,
         data: CanData,
         frequency: int,
@@ -31,12 +33,15 @@ class PeriodicMessage(can.Message):
             self.channel = DEFAULT_CHANNEL
         self.frequency = frequency
         self.delta = 1.0 / frequency  # seconds
+        self.car = car
 
     def __repr__(self):
-        return (f"PeriodicMessage(arbitration_id={self.arbitration_id:#x}, "
-                f"dlen={len(self.data)}, data={self.data.hex()}, "
-                f"frequency={self.frequency}, "
-                f"channel={self.channel})")
+        return (
+            f"PeriodicMessage(arbitration_id={self.arbitration_id:#x}, "
+            f"dlen={len(self.data)}, data={self.data.hex()}, "
+            f"frequency={self.frequency}, "
+            f"channel={self.channel})"
+        )
 
     def update(self):
         """If message needs any fields in self.data (or other content) updated
@@ -60,12 +65,20 @@ def ffs(x):
 
     Cribbed from https://stackoverflow.com/a/36059264/1006619
     """
-    return (x&-x).bit_length()-1
+    return (x & -x).bit_length() - 1
 
 
 class CounterField:
-    """ Little convenience class to wrap a counter field in a bytearray. """
-    def __init__(self, target: bytearray, byte_idx: int, bitmask: int, delta: int = -1, skip: Optional[int] = None):
+    """Little convenience class to wrap a counter field in a bytearray."""
+
+    def __init__(
+        self,
+        target: bytearray,
+        byte_idx: int,
+        bitmask: int,
+        delta: int = -1,
+        skip: Optional[int] = None,
+    ):
         self.target = target
         self.idx = byte_idx
         self.bitmask = bitmask

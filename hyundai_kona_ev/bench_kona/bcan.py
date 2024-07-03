@@ -43,8 +43,9 @@ MSGS = [
 ]
 
 
-def get_messages():
-    return [PeriodicMessage(can_id,
+def get_messages(car):
+    return [PeriodicMessage(car,
+                            can_id,
                             bytes.fromhex(data.replace(',', '')),
                             hz,
                             channel)
