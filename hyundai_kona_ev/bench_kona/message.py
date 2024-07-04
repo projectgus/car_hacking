@@ -26,6 +26,7 @@ class PeriodicMessage(can.Message):
             arbitration_id=arbitration_id,
             data=data,
             is_extended_id=False,
+            is_rx=False,
             channel=channel,
         )
         if channel is None:
@@ -33,6 +34,7 @@ class PeriodicMessage(can.Message):
         self.frequency = frequency
         self.delta = 1.0 / frequency  # seconds
         self.car = car
+        self.enabled = True
 
     def __repr__(self):
         return (
@@ -48,12 +50,17 @@ class PeriodicMessage(can.Message):
         """
         pass
 
-    async def coro(self, bus: can.BusABC):
+    def set_enabled(self, value):
+        self.enabled = value
+        print(f"Message {hex(self.arbitration_id)} enabled = {value}")
+
+    async def coro(self, bus: can.BusABC, can_logfile):
         next_tx = time.time()
         while True:
-            self.update()
-            print(self)  # temporary(?) logging
-            bus.send(self, timeout=0.05)
+            if self.enabled:
+                self.update()
+                print(self, file=can_logfile)
+                bus.send(self, timeout=0.05)
             next_tx += self.delta
             await sleep(max(0, next_tx - time.time()))
 

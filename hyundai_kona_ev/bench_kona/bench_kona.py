@@ -9,30 +9,41 @@ from can.notifier import MessageRecipient
 from typing import List
 
 from PySide6.QtCore import (Qt, QObject, Signal, Slot, QTimer)
-from PySide6.QtWidgets import (QApplication, QCheckBox, QLabel, QMainWindow, QPushButton, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QApplication, QCheckBox, QGroupBox, QLabel, QMainWindow, QPushButton, QVBoxLayout, QWidget)
 from PySide6.QtAsyncio import QAsyncioEventLoopPolicy
 
 from message import PCAN_CH
 import ieb
+import other
 import srscm
+
+can_log_name = f"{datetime.datetime.now().isoformat()}-bench_kona.csv"
+can_log = open(can_log_name, "w")
+print(f"Writing CAN messages to {can_log_name}...")
 
 
 class Car:
     def __init__(self):
         self.braking = True  # start with virtual foot on brake
 
+        # Set up all the messages we'll be sending
+        self.tx_messages = {}
+        for mod in (ieb, srscm, other):
+            for m in mod.get_messages(self):
+                self.tx_messages[m.arbitration_id] = m
+
     def on_message(self, msg: can.Message):
         """ Handle updates, will be called from a non-asyncio non-Qt thread!!  """
-        print(msg)
+        print(msg, file=can_log)
+        if msg.arbitration_id in self.tx_messages:
+            print(f'WARNING: {msg.arbitration_id:#x} appears in both TX and RX')
 
     async def rx_coro(self, bus: can.BusABC):
         """Receive from the CAN bus and log whatever it sends us, plus invoke handler."""
         reader = can.AsyncBufferedReader()
-        logger = can.Logger(f"{datetime.datetime.now().isoformat()}-bench_kona.csv")
 
         listeners: List[MessageRecipient] = [
             reader,  # AsyncBufferedReader() listener
-            logger,  # Regular Listener object
         ]
 
         # Note: the async version of this class doesn't use asyncio event loop
@@ -43,20 +54,15 @@ class Car:
         self._notifier = can.Notifier(bus, listeners)
         self._notifier.add_listener(self.on_message)
 
+    async def start(self):
+        """ Set up the asyncio bench_kona "model" """
+        if "--virtual" in sys.argv:
+            bus = can.interface.Bus("virtual", interface="virtual")
+        else:
+            bus = can.Bus(channel=(PCAN_CH,))
 
-async def main(car):
-    """ Set up the asyncio bench_kona "model" """
-    messages = []
-    for mod in (ieb, srscm):
-        messages += mod.get_messages(car)
-
-    if "--virtual" in sys.argv:
-        bus = can.interface.Bus("virtual", interface="virtual")
-    else:
-        bus = can.Bus(channel=(PCAN_CH,))
-
-    # gather creates a task for each coroutine
-    await asyncio.gather(car.rx_coro(bus), *(m.coro(bus) for m in messages))
+        # gather creates a task for each coroutine
+        await asyncio.gather(self.rx_coro(bus), *(m.coro(bus, can_log) for m in self.tx_messages.values()))
 
 
 class MainWindow(QMainWindow):
@@ -74,6 +80,19 @@ class MainWindow(QMainWindow):
         self.cb_braking.toggled.connect(self.on_braking_toggled)
 
         layout.addWidget(self.cb_braking)
+
+        txGroup = QGroupBox("Enabled TX Messages")
+        txLayout = QVBoxLayout()
+        txGroup.setLayout(txLayout)
+        for m in car.tx_messages.values():
+            summary = m.__doc__
+            if "\n" in summary:
+                summary = summary[:summary.index("\n")]
+            cb = QCheckBox(hex(m.arbitration_id) + " - " + summary)
+            cb.setChecked(m.enabled)
+            cb.toggled.connect(m.set_enabled)
+            txLayout.addWidget(cb)
+        layout.addWidget(txGroup)
 
     @Slot(bool)
     def on_braking_toggled(self, is_checked):
@@ -100,7 +119,7 @@ if __name__ == "__main__":
     car = Car()
 
     if "--no-ui" in sys.argv:
-        asyncio.run(main(car))
+        asyncio.run(car.start())
     else:
 
         # Otherwise, display a UI while running model in background asyncio
@@ -110,11 +129,11 @@ if __name__ == "__main__":
         main_window = MainWindow(car)
         main_window.show()
 
-        # Run main() coro on the event loop, once it exists.
+        # Run car.start() coro on the event loop, once it exists.
         # Seems a bit verbose...?
         timer = QTimer(app)
         timer.setSingleShot(True)
-        timer.timeout.connect(lambda: asyncio.ensure_future(main(car)))
+        timer.timeout.connect(lambda: asyncio.ensure_future(car.start()))
         timer.start()
 
         signal.signal(signal.SIGINT, signal.SIG_DFL)
