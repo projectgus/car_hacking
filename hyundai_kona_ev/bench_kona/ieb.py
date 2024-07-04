@@ -96,10 +96,6 @@ class IEB_507_TCS(PeriodicMessage):
 
 
 def get_messages(car):
-    for k in globals().values():
-        if type(k) == type and issubclass(k, PeriodicMessage):
-            print(k)
-
     return [
         k(car)
         for k in globals().values()

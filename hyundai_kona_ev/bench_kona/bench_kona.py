@@ -30,6 +30,7 @@ class Car:
         self.tx_messages = {}
         for mod in (ieb, srscm, other):
             for m in mod.get_messages(self):
+                assert m.arbitration_id not in self.tx_messages  # check for accidental dupes
                 self.tx_messages[m.arbitration_id] = m
 
     def on_message(self, msg: can.Message):
@@ -84,7 +85,7 @@ class MainWindow(QMainWindow):
         txGroup = QGroupBox("Enabled TX Messages")
         txLayout = QVBoxLayout()
         txGroup.setLayout(txLayout)
-        for m in car.tx_messages.values():
+        for m in sorted(car.tx_messages.values(), key=lambda m: m.arbitration_id):
             summary = m.__doc__
             if "\n" in summary:
                 summary = summary[:summary.index("\n")]

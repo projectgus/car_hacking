@@ -12,10 +12,6 @@ class ACU_5A0(PeriodicMessage):
 
 
 def get_messages(car):
-    for k in globals().values():
-        if type(k) == type and issubclass(k, PeriodicMessage):
-            print(k)
-
     return [k(car) for k in globals().values()
             if type(k) == type
             and k != PeriodicMessage

@@ -82,6 +82,81 @@ MSGS = [
         "89,00,10,10,EC,7C,82,8E",  # probably the AC control unit
         10,
     ),
+    (
+        0x414,
+        "00,00,00,00,00,00,00,00",  # first byte changes briefly during charge session
+        10,
+    ),
+    (
+        0x462,
+        "FE,3F,FF,0F,F0,1F,00,00",  # one bit changes 2/3 way through charge session
+        50,
+    ),
+    (
+        0x4FE,
+        "FF,FF,7F,FF,FF,00,FF,FF",  # unchanging in charge session
+        5,
+    ),
+    (
+        0x50d,
+        "00,00,30,01,00,00,00,00",  # unchanging in charge session
+        5,
+    ),
+    (
+        0x520,
+        "00,00,00,00,00,00,00,00", # one bit sets a few times brielfy during charging
+        10,
+        ),
+    (
+        0x55f,
+        "00,00,00,00,00,00,00,00",  # always zero during charge
+        10,
+    ),
+    (
+        0x561,
+        "00,00,00,00,00,00,00,00",  # always zero during charge
+        10,
+    ),
+    (
+        0x578,
+        "00,00,00,00,00,00",  # mostly zero during charge, one byte goes to 0F for 36s
+        10,
+    ),
+    (
+        0x588,
+        "58,1C,00,00,00,00,00,00",  # first two bytes change a couple of times in charging
+        10,
+    ),
+    (
+        0x593,
+        "01,08,FF,FF,FF,FF",  # first byte has 3 discrete values over charge log
+        5,
+        ),
+    # (  # in the bench logs already
+    #     0x59c,
+    #     "00,00,76,10,FA,00,00,00",  # some bytes transition counting up a few times during charge log
+    #     10,
+    #     ),
+    (
+        0x5ca,
+        "00,00,00,FE,FE,10,00,00",  # value transitions once during charge log
+        1,
+    ),
+    (
+        0x5cc,
+        "00,0C,00,00,00,00,00,F0",  # value changes a few times during charge log
+        1,
+    ),
+    (
+        0x5df,
+        "C5,FF,FF,01,00,00,00,00",  # value changes one time in charge log
+        5,
+    ),
+    (
+        0x5f9,
+        "8B,88,FF,FF,00,1A,00,00",  # value changes quite a bit during charge log, but no counter field
+        10,
+    ),
 ]
 
 
