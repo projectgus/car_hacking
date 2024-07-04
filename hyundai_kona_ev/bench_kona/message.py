@@ -4,7 +4,6 @@ import time
 from can.typechecking import CanData, Channel
 from typing import Optional
 
-BCAN_CH = 1
 PCAN_CH = 0
 
 DEFAULT_CHANNEL = PCAN_CH

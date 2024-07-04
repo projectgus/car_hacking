@@ -12,8 +12,7 @@ from PySide6.QtCore import (Qt, QObject, Signal, Slot, QTimer)
 from PySide6.QtWidgets import (QApplication, QCheckBox, QLabel, QMainWindow, QPushButton, QVBoxLayout, QWidget)
 from PySide6.QtAsyncio import QAsyncioEventLoopPolicy
 
-from message import PCAN_CH, BCAN_CH
-import bcan
+from message import PCAN_CH
 import ieb
 import srscm
 
@@ -48,13 +47,13 @@ class Car:
 async def main(car):
     """ Set up the asyncio bench_kona "model" """
     messages = []
-    for mod in (bcan, ieb, srscm):
+    for mod in (ieb, srscm):
         messages += mod.get_messages(car)
 
     if "--virtual" in sys.argv:
         bus = can.interface.Bus("virtual", interface="virtual")
     else:
-        bus = can.Bus(channel=(PCAN_CH, BCAN_CH))
+        bus = can.Bus(channel=(PCAN_CH,))
 
     # gather creates a task for each coroutine
     await asyncio.gather(car.rx_coro(bus), *(m.coro(bus) for m in messages))

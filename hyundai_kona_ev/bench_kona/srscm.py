@@ -1,4 +1,4 @@
-from message import PeriodicMessage, PCAN_CH
+from message import PeriodicMessage
 
 
 class ACU_5A0(PeriodicMessage):
@@ -8,8 +8,7 @@ class ACU_5A0(PeriodicMessage):
         super().__init__(car,
                          0x5a0,
                          bytearray.fromhex('000000C025029101'),
-                         1,
-                         PCAN_CH)
+                         1)
 
 
 def get_messages(car):
