@@ -4,7 +4,7 @@ import time
 from can.typechecking import CanData, Channel
 from typing import Optional
 
-PCAN_CH = 0
+PCAN_CH = "can0"
 
 DEFAULT_CHANNEL = PCAN_CH
 
@@ -55,13 +55,17 @@ class PeriodicMessage(can.Message):
         print(f"Message {hex(self.arbitration_id)} enabled = {value}")
 
     async def coro(self, bus: can.BusABC, can_logfile):
+        await sleep(self.delta)  # staggered start to avoid overloading the bus
         next_tx = time.time()
         while True:
             if self.enabled:
                 self.update()
                 print(self, file=can_logfile)
-                bus.send(self, timeout=0.05)
-            next_tx += self.delta
+                try:
+                    bus.send(self, timeout=0.025)
+                except can.CanError as e:
+                    print(f"ID {self.arbitration_id:#x} ({self.frequency}Hz) failed to send: {e}")
+                next_tx += self.delta
             await sleep(max(0, next_tx - time.time()))
 
 

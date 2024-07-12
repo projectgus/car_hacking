@@ -5,11 +5,6 @@ import time
 
 MSGS = [
     (
-        0x5EC,
-        "00,00,00,00,00,00,00,00",
-        10,
-    ),  # first bit of first byte 00->01 when charger connected (maybe when locked)
-    (
         0x5B3,
         "40,10,FE,30,00,00,00,00",
         5,
@@ -64,11 +59,6 @@ MSGS = [
     #     10,
     # ),
     (
-        0x5D0,
-        "9D,13,04,00,00,00,00,00",  # probably the odometer reading
-        1,
-    ),
-    (
         0x5F6,
         "00,00,00,00,00,00,00,00", # goes non-zero for a brief period mid-charge session
         10,
@@ -81,11 +71,6 @@ MSGS = [
     (
         0x5F8,
         "89,00,10,10,EC,7C,82,8E",  # probably the AC control unit
-        10,
-    ),
-    (
-        0x414,
-        "00,00,00,00,00,00,00,00",  # first byte changes briefly during charge session
         10,
     ),
     (
@@ -149,16 +134,6 @@ MSGS = [
         1,
     ),
     (
-        0x5d3,  # HU_DATC_PE_00 (???)
-        "0F,00,00,00,00,00,00,00",
-        1,
-    ),
-    (
-        0x5df,
-        "C5,FF,FF,01,00,00,00,00",  # value changes one time in charge log
-        5,
-    ),
-    (
         0x5f9,
         "8B,88,FF,FF,00,1A,00,00",  # value changes quite a bit during charge log, but no counter field
         10,
@@ -170,7 +145,7 @@ class UNK_164(PeriodicMessage):
     """???"""
 
     def __init__(self, car):
-        super().__init__(car, 0x164, bytes.fromhex("00080000"), 100)
+        super().__init__(car, 0x164, bytes.fromhex("00080000"), 10)  # actually 100!
         # looks like a counter field in byte 3
         self.counter = CounterField(self.data, 2, 0x1F, delta=0x02)
 
@@ -210,36 +185,6 @@ class UNK_5F5(PeriodicMessage):
         self.data[3] = sum(self.data[:3]) & 0xFF
         # the last byte looks like a 5-bit CRC or something. currently not implemented :|
 
-
-class CGW_541(PeriodicMessage):
-    """ Sent by IGPM. """
-
-    def __init__(self, car):
-        super().__init__(car, 0x541, bytes.fromhex("0000420008000000"), 10)
-
-
-class CGW_553(PeriodicMessage):
-    """ Sent by IGPM. """
-
-    def __init__(self, car):
-        super().__init__(car, 0x553, bytes.fromhex("0400000000008000"), 5)
-
-class CGW_Clock(PeriodicMessage):
-    """ Sent by IGPM. """
-    def __init__(self, car):
-        super().__init__(car, 0x567, bytes.fromhex("0200000000000000"), 10)
-        self.last_sec = 0
-
-    def update(self):
-        s = int(time.time())
-        if s == self.last_sec:
-            return
-        self.last_sec = s
-        c = time.localtime(s)
-        self.data[1] = c.tm_hour
-        self.data[2] = c.tm_min
-        self.data[3] = c.tm_sec
-        self.data[4] = 1  # valid flag
 
 def get_messages(car):
     return [
