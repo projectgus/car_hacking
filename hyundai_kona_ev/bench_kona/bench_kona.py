@@ -17,7 +17,7 @@ import ieb
 import other
 import srscm
 
-can_log_name = f"{datetime.datetime.now().isoformat()}-bench_kona.csv"
+can_log_name = f"{datetime.datetime.now().isoformat()}-bench_kona.log"
 can_log = open(can_log_name, "w")
 print(f"Writing CAN messages to {can_log_name}...")
 
