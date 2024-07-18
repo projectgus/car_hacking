@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from PySide6.QtAsyncio import QAsyncioEventLoopPolicy
+from PySide6 import QtAsyncio
 
 from message import PCAN_CH
 import ieb
@@ -38,6 +38,7 @@ class Car:
     def __init__(self):
         self.braking = True  # start with virtual foot on brake
         self.charge_port_locked = False
+        self.bus = None
 
         # Set up all the messages we'll be sending
         self.tx_messages = {}
@@ -73,15 +74,49 @@ class Car:
     async def start(self):
         """Set up the asyncio bench_kona "model" """
         if "--virtual" in sys.argv:
-            bus = can.interface.Bus("virtual", interface="virtual")
+            self.bus = can.interface.Bus("virtual", interface="virtual")
         else:
-            bus = can.Bus(channel=PCAN_CH)
+            self.bus = can.Bus(channel=PCAN_CH)
 
         # gather creates a task for each coroutine
         await asyncio.gather(
-            self.rx_coro(bus),
-            *(m.coro(bus, can_log) for m in self.tx_messages.values()),
+            self.rx_coro(self.bus),
+            *(m.coro(self.bus, can_log) for m in self.tx_messages.values()),
         )
+
+    async def send_ac_current(self, value):
+        """ Send a short burst of CAN messages to update OBC state
+        """
+        print("Starting AC charge current change...")
+        msg = can.Message(arbitration_id=0x562,
+                          data=[0x00, value, 0x03, 0x00, 0xFF, 0xFF, 0x00, 0x00])
+        print(msg)
+        for _ in range(3):
+            self.bus.send(msg, timeout=0.05)
+            await asyncio.sleep(0.040)
+
+        msg.data[1] = 0x00
+        print(msg)
+
+        for _ in range(3):
+            self.bus.send(msg, timeout=0.05)
+            await asyncio.sleep(0.040)
+
+        print("Finished AC charge current change")
+
+    async def send_ac_charge_limit(self, percent):
+        """ Send a short burst of CAN messages to update charge termination
+        """
+        print(f"Starting AC charge to {percent}% change...")
+        level = int(percent * 2)
+        msg = can.Message(arbitration_id=0x562,
+                          data=[0x00, 0x1C, 0x03, 0x00, level, 0xFF, 0x00, 0x00])
+        print(msg)
+        for _ in range(3):
+            self.bus.send(msg, timeout=0.05)
+            await asyncio.sleep(0.040)
+
+        print(f"Finished AC charge to {percent}% change")
 
 
 class MainWindow(QMainWindow):
@@ -104,6 +139,30 @@ class MainWindow(QMainWindow):
         self.cb_locked.toggled.connect(self.on_charge_port_lock_toggled)
 
         layout.addWidget(self.cb_locked)
+
+        # AC Charge Current buttons
+        def make_send_ac_charge_current_fn(value):
+            # bind pct to unique value in the lambda
+            return lambda checked: asyncio.create_task(
+                self.car.send_ac_current(value))
+
+        for label, value in (("Maximum", 0x08),
+                             ("Reduced", 0x0C),
+                             ("Minimum", 0x04)):
+            button = QPushButton(f"AC Charge {label}")
+            button.clicked.connect(make_send_ac_charge_current_fn(value))
+            layout.addWidget(button)
+
+        def make_send_ac_charge_limit_fn(pct):
+            # bind pct to unique value in the lambda
+            return lambda checked: asyncio.create_task(
+                self.car.send_ac_charge_limit(pct))
+
+        # AC charge termination %
+        for pct in (50, 70, 100):
+            button = QPushButton(f"AC Charge Limit {pct}%")
+            button.clicked.connect(make_send_ac_charge_limit_fn(pct))
+            layout.addWidget(button)
 
         txGroup = QGroupBox("Enabled TX Messages")
         txLayout = QGridLayout()
@@ -160,7 +219,7 @@ if __name__ == "__main__":
 
         # Otherwise, display a UI while running model in background asyncio
         app = QApplication(sys.argv)
-        asyncio.set_event_loop_policy(QAsyncioEventLoopPolicy())
+        asyncio.set_event_loop_policy(QtAsyncio.QAsyncioEventLoopPolicy())
 
         main_window = MainWindow(car)
         main_window.show()
