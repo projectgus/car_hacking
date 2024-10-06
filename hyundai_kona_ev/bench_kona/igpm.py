@@ -31,8 +31,21 @@ class CGW_541(PeriodicMessage):
     """Sent by IGPM."""
 
     def __init__(self, car):
-        super().__init__(car, 0x541, bytes.fromhex("0000420008000000"), 10)
+        super().__init__(car, 0x541, [0x00,
+                                      0x00,
+                                      # drivers door closed, drivers seatbelt on
+                                      # needs at least one of these to go into D
+                                      0x44,
+                                      0x00,
+                                      0x08,
+                                      0x08,  # "drive type option" bit set?
+                                      0x00,
+                                      0x00], 10)
 
+    def update(self):
+        self.data[0] = 0x03 if self.car.ignition_on else 0x00  # ignitionsw
+        self.data[7] = 0x0C if self.car.ignition_on else 0x00  # IGN1, IGN2
+        # note: parking brake switch is also in byte 7
 
 class CGW_553(PeriodicMessage):
     """Sent by IGPM."""
