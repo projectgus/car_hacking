@@ -5,6 +5,7 @@ import can
 import math
 import sys
 import datetime
+import time
 import signal
 from can.notifier import MessageRecipient
 from typing import List
@@ -15,6 +16,7 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QGridLayout,
     QGroupBox,
+    QHBoxLayout,
     QLabel,
     QMainWindow,
     QPushButton,
@@ -36,9 +38,23 @@ print(f"Writing CAN messages to {can_log_name}")
 
 class Car:
     def __init__(self):
+        # fields updated by user
         self.braking = True  # start with virtual foot on brake
         self.charge_port_locked = False
+        self.ignition_on = False
+
+        # fields updated from CAN
+        self.msgs_per_sec = 0
+        self.contactor_status = 0x00
+        self.contactor_closed = False
+        self.inverter_voltage = None
+
+        # internal stuff
         self.bus = None
+
+        self._new_msgs = 0
+        self._last_sec = 0
+        self._last_inverter_v = 0
 
         # Set up all the messages we'll be sending
         self.tx_messages = {}
@@ -54,6 +70,26 @@ class Car:
         print(msg, file=can_log)
         if msg.arbitration_id in self.tx_messages:
             print(f"WARNING: {msg.arbitration_id:#x} appears in both TX and RX")
+
+        # update the msgs per second counter
+        self._new_msgs += 1
+        sec = int(time.time())
+        if sec != self._last_sec:
+            self.msgs_per_sec = self._new_msgs
+            self._new_msgs = 0
+            self._last_sec = sec
+
+        if msg.arbitration_id == 0x5a3:
+            # read contactor status
+            self.contactor_status = msg.data[0]
+            self.contactor_closed = bool(msg.data[0] & (1 << 6))
+        elif msg.arbitration_id == 0x524:
+            # update inverter voltage
+            self.inverter_voltage = msg.data[0] + (msg.data[1] << 8)
+            self._last_inverter_v = sec
+        elif self._last_inverter_v is not None and sec - self._last_inverter_v > 4:
+            # Missing inverter voltage message
+            self._last_inverter_v = None
 
     async def rx_coro(self, bus: can.BusABC):
         """Receive from the CAN bus and log whatever it sends us, plus invoke handler."""
@@ -129,6 +165,26 @@ class MainWindow(QMainWindow):
 
         layout = QVBoxLayout(widget)
 
+        status_layout = QHBoxLayout()
+        self.contactor_on = QLabel("--")
+        self.contactor_status = QLabel("0x??")
+        self.inverter_v = QLabel("?? V")
+        self.inverter_v.setEnabled(False)
+        for w in (QLabel("Contactor"),
+                  self.contactor_on,
+                  self.contactor_status,
+                  QLabel("Inverter HV"),
+                  self.inverter_v):
+            status_layout.addWidget(w)
+        layout.addLayout(status_layout)
+
+        self.msgs_per_sec = QLabel("-")
+        layout.addWidget(self.msgs_per_sec)
+
+        self.cb_ignition = QCheckBox("Ignition On")
+        self.cb_ignition.toggled.connect(self.on_ignition_toggled)
+        layout.addWidget(self.cb_ignition)
+
         self.cb_braking = QCheckBox("Braking")
         self.cb_braking.setChecked(True)
         self.cb_braking.toggled.connect(self.on_braking_toggled)
@@ -146,23 +202,29 @@ class MainWindow(QMainWindow):
             return lambda checked: asyncio.create_task(
                 self.car.send_ac_current(value))
 
+        charge_layout = QHBoxLayout()
+        charge_layout.addWidget(QLabel("AC Charge Current"))
         for label, value in (("Maximum", 0x08),
                              ("Reduced", 0x0C),
                              ("Minimum", 0x04)):
-            button = QPushButton(f"AC Charge {label}")
+            button = QPushButton(label)
             button.clicked.connect(make_send_ac_charge_current_fn(value))
-            layout.addWidget(button)
+            charge_layout.addWidget(button)
+        layout.addLayout(charge_layout)
 
+        # AC charge termination %
         def make_send_ac_charge_limit_fn(pct):
             # bind pct to unique value in the lambda
             return lambda checked: asyncio.create_task(
                 self.car.send_ac_charge_limit(pct))
 
-        # AC charge termination %
+        limit_layout = QHBoxLayout()
+        limit_layout.addWidget(QLabel("AC Charge Limit"))
         for pct in (50, 70, 100):
-            button = QPushButton(f"AC Charge Limit {pct}%")
+            button = QPushButton(f"{pct}%")
             button.clicked.connect(make_send_ac_charge_limit_fn(pct))
-            layout.addWidget(button)
+            limit_layout.addWidget(button)
+        layout.addLayout(limit_layout)
 
         txGroup = QGroupBox("Enabled TX Messages")
         txLayout = QGridLayout()
@@ -182,6 +244,10 @@ class MainWindow(QMainWindow):
             txLayout.addWidget(cb, i % msgs_per_col, i // msgs_per_col)
         layout.addWidget(txGroup)
 
+        self.refresh = QTimer(app)
+        self.refresh.timeout.connect(self.refresh_ui)
+        self.refresh.start(250)
+
     @Slot(bool)
     def on_braking_toggled(self, is_checked):
         print(f"Braking now {is_checked}")
@@ -191,6 +257,24 @@ class MainWindow(QMainWindow):
     def on_charge_port_lock_toggled(self, is_checked):
         print(f"Charge port lock now {is_checked}")
         self.car.charge_port_locked = is_checked
+
+    @Slot(bool)
+    def on_ignition_toggled(self, is_checked):
+        print(f"Ignition now {is_checked}")
+        self.car.ignition_on = is_checked
+
+    @Slot()
+    def refresh_ui(self):
+        self.contactor_on.setText("ON" if self.car.contactor_closed else "OFF")
+        self.contactor_status.setText(hex(self.car.contactor_status))
+        v = self.car.inverter_voltage
+        if self.car._last_inverter_v is None:
+            self.inverter_v.setEnabled(False)
+        else:
+            self.inverter_v.setText(f"{v} V")
+            self.inverter_v.setEnabled(True)
+
+        self.msgs_per_sec.setText(f"{self.car.msgs_per_sec} messages/sec")
 
 
 class AsyncHelper(QObject):
