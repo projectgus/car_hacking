@@ -61,23 +61,9 @@ for m in msgs:
 
     if last_m is not None:
         diff = bytes((a^b) for (a,b) in zip(m, last_m))
-        res = ~sum(m_) & 0xFFFFFF
+        res = ~sum(nibble_sum(n) for n in m_) & 0xFFFF
 
-        calc_cs = (res & 0xF0) >> 4
-
-        if res & 0x0F >= 0xd:
-            calc_cs += (res & 0x0F) - 0xd
-        else:
-            calc_cs += (res & 0x0F) + 2
-
-        # About 1% of results still don't match, almost all of these are where 'res' ends in 0xc
-        # and this method is off by one.
-        #
-        # Less than 0.001% of other results don't match, maybe due to actual on the wire errors?
-        #
-        # For some non-matching results, the initial sum value 'res' is the same as a
-        # different correct packet but the checksum on the wire is different... which implies the
-        # complement sum isn't the whole picture here..
+        calc_cs = (res & 0x0F) + 1
 
         diff_res = (cs - calc_cs)
         is_good = calc_cs & 0xf == cs
