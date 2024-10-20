@@ -41,6 +41,9 @@ def sum_inverse(x):
         r += n ^ 0xFF
     return r
 
+good = 0
+bad = 0
+
 last_m = None
 r = dict()
 for m in msgs:
@@ -72,12 +75,20 @@ for m in msgs:
         #
         # Less than 0.001% of other results don't match, maybe due to actual on the wire errors?
         #
-        # For some non-matching results, the initial sum value is the same as a
-        # different correct packet but the checksum on the wire is different...
+        # For some non-matching results, the initial sum value 'res' is the same as a
+        # different correct packet but the checksum on the wire is different... which implies the
+        # complement sum isn't the whole picture here..
 
         diff_res = (cs - calc_cs)
-        if res & 0x0f == 0xc:
-            print(hex(cs), m.hex(), hex(res), hex(calc_cs), diff_res, calc_cs & 0xf == cs)
+        is_good = calc_cs & 0xf == cs
+
+        if is_good:
+            good += 1
+        else:
+            bad += 1
+
+        if True or res & 0x0f == 0xc:
+            print(hex(cs), m.hex(), hex(res), hex(calc_cs), diff_res, is_good)
 
     last_m = m
     continue
@@ -98,3 +109,5 @@ for m in msgs:
             hex(nibble_sub(as_xor)),
             hex(nibble_sub(as_sub)),
             )
+
+print("Good checksums ", good, " bad checksums ", bad, " overall ratio ", bad/(good+bad))
