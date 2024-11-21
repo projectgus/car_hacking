@@ -37,7 +37,7 @@ def main(from_path, to_path):
             )
             for line in fr:
                 m = re.match(
-                    r"Timestamp: *([\d\.]+) *ID: *([\da-f]+) *([S]) ([RT]x)? *DLC?: *(\d+) *([\da-f ]{23}) *Channel: (\d)",
+                    r"Timestamp: *([\d\.]+) *ID: *([\da-f]+) *([S]) ([RT]x)? *DLC?: *(\d+) *([\da-f ]{23}) *Channel: c?a?n?(\d)",
                     line,
                 )
                 if m:
