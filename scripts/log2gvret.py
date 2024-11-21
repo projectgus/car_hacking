@@ -54,9 +54,8 @@ def main(from_path, to_path):
 
 
 if __name__ == "__main__":
-    inpath = sys.argv[1]
-    try:
-        outpath = sys.argv[2]
-    except IndexError:
+    for inpath in sys.argv[1:]:
         outpath = os.path.splitext(sys.argv[1])[0] + ".csv"
-    main(inpath, outpath)
+        if os.path.exists(outpath):
+            raise SystemExit(f"Can't convert {inpath} to {outpath}: Destination exists")
+        main(inpath, outpath)
